@@ -4,8 +4,18 @@ const app = express();
 
 const PORT = process.env.PORT || 8080;
 
-app.get("/", (req,res) => {
+app.use(express.static("public"));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+app.get("/exercise", (req,res) => {
     res.sendFile(path.join(__dirname +"/public/exercise.html"));
+});
+app.get("/stats", (req,res) => {
+    res.sendFile(path.join(__dirname +"/public/stats.html"));
+});
+app.get("/", (req,res) => {
+    res.sendFile(path.join(__dirname +"/index.html"));
 });
 
 app.listen(PORT, () => {
