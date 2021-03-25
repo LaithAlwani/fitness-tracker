@@ -2,7 +2,7 @@ const express = require("express");
 const path = require("path");
 const mongoose = require("mongoose");
 
-const db = require("./models");
+const Workout = require("./models/workout");
 
 const app = express();
 
@@ -12,17 +12,15 @@ app.use(express.static("public"));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost/fintess",
-{
+mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost/fintess", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   useCreateIndex: true,
-  useFindAndModify: false
+  useFindAndModify: false,
 });
 
-app.post("/api/workouts", (req, res) => {
-  console.log(req.body);
-  db.Workout.create({})
+app.post("/api/workouts", ({ body }, res) => {
+  Workout.create(body)
     .then((dbWorkout) => {
       console.log(dbWorkout);
       res.json(dbWorkout);
@@ -33,33 +31,41 @@ app.post("/api/workouts", (req, res) => {
     });
 });
 
-app.put("/api/workouts/:id", (req, res) => {
-  db.Exercise.create(req.body).then((dbExercise) => {
-      console.log(dbExercise);
-    db.Workout.findByIdAndUpdate(
-      req.params.id,
-      { $push: { exerciseCollection: dbExercise._id } },
-      { new: true }
-    )
-      .then((dbWorkout) => {
-        console.log("chosen workout" + dbWorkout);
-        res.json(dbWorkout);
-      })
-      .catch((err) => {
-        console.log(err);
-        res.json(err);
-      });
-  });
+app.put("/api/workouts/:id", ({body, params}, res) => {
+  Workout.findByIdAndUpdate(
+    params.id,
+    { $push: { exercises: body} },
+    { new: true }
+  )
+    .then((dbWorkout) => {
+      console.log("chosen workout" + dbWorkout);
+      res.json(dbWorkout);
+    })
+    .catch((err) => {
+      console.log(err);
+      res.json(err);
+    });
+});
+
+app.get("/api/workouts/range", (req, res) => {
+  Workout.find()
+    .then((dbWorkout) => {
+      res.json(dbWorkout);
+    })
+    .catch((err) => {
+      res.json(err);
+    });
 });
 
 app.get("/api/workouts", (req, res) => {
-    db.Workout.find({})
-    .then(dbWorkout =>{
-        console.log(dbWorkout);
-        res.json(dbWorkout);
-    }).catch(err => {
-        console.log(err);
-        res.json(err);
+  Workout.find({})
+    .then((dbWorkout) => {
+      console.log(dbWorkout);
+      res.json(dbWorkout);
+    })
+    .catch((err) => {
+      console.log(err);
+      res.json(err);
     });
 });
 
