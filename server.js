@@ -22,7 +22,6 @@ mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost/fintess", {
 app.post("/api/workouts", ({ body }, res) => {
   Workout.create(body)
     .then((dbWorkout) => {
-      console.log(dbWorkout);
       res.json(dbWorkout);
     })
     .catch((err) => {
@@ -38,7 +37,6 @@ app.put("/api/workouts/:id", ({body, params}, res) => {
     { new: true }
   )
     .then((dbWorkout) => {
-      console.log("chosen workout" + dbWorkout);
       res.json(dbWorkout);
     })
     .catch((err) => {
@@ -58,9 +56,8 @@ app.get("/api/workouts/range", (req, res) => {
 });
 
 app.get("/api/workouts", (req, res) => {
-  Workout.find({})
+  Workout.find()
     .then((dbWorkout) => {
-      console.log(dbWorkout);
       res.json(dbWorkout);
     })
     .catch((err) => {
