@@ -3,15 +3,15 @@
 ## Table of Content:
 1.[Description](#Description)
 
-3.[Deployed App](#Deployed-App)
+2.[Deployed App](#Deployed-App)
 
-4.[Installation Instructions](#Installation-Instructions)
+3.[Installation Instructions](#Installation-Instructions)
 
-5.[Usage Information](#Usage-Information)
+4.[Usage Information](#Usage-Information)
 
-6.[License](#License)
+5.[License](#License)
 
-7.[Questions](#Questions)
+6.[Questions](#Questions)
 
 
 ## Description:
