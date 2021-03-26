@@ -28,6 +28,8 @@ Tracks a users workout for the by collecting exercises information
 * start a new workout for the day
 * add all the exercise that have been comepleted. 
 
+![](./public/assets/images/workout.png)
+
 ## License:
 This application is covered under the [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT).    
 
