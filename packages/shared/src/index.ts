@@ -3,7 +3,8 @@
 // XP, achievements, quests, PR detection, unit conversion, formatters all live here
 // so Convex mutations and the mobile UI evaluate the same code.
 //
-// Modules will be added in their respective phases:
+// Modules added per phase:
+//   - exercises.ts    (Phase 2) — domain constants
 //   - prs.ts          (Phase 7)
 //   - xp.ts           (Phase 8)
 //   - achievements.ts (Phase 8)
@@ -11,4 +12,4 @@
 //   - units.ts        (Phase 5)
 //   - format.ts       (Phase 5)
 
-export {};
+export * from "./exercises";

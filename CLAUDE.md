@@ -10,7 +10,7 @@
 
 **Plan file:** `C:\Users\laith\.claude\plans\i-want-to-create-inherited-brooks.md` — full implementation plan with phases, schema, gamification design, and store-launch checklist. Read it before making non-trivial decisions.
 
-**Currently working on:** Phase 0 (Monorepo + Expo scaffold + custom auth UI). Last sign-off: _none yet_.
+**Currently working on:** Phase 2 (Exercise library — Convex CRUD, seeded library, browse + filter + add custom). Last sign-off: **v0.2** (Phase 1 — schema + greeting + tabs + profile).
 
 ### Stack
 
