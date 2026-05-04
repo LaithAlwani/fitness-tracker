@@ -1,0 +1,29 @@
+{
+  "name": "fitness-tracker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Mobile-first fitness tracker (Expo + Convex + Clerk) with Duolingo-style gamification.",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "mobile": "pnpm --filter @fitness/mobile exec expo start",
+    "convex:dev": "pnpm --filter @fitness/convex exec convex dev",
+    "convex:deploy": "pnpm --filter @fitness/convex exec convex deploy"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "expo-crypto": "~15.0.9"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@fitness/convex",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./convex/_generated/api.js",
+  "types": "./convex/_generated/api.d.ts",
+  "exports": {
+    ".": {
+      "types": "./convex/_generated/api.d.ts",
+      "default": "./convex/_generated/api.js"
+    },
+    "./dataModel": {
+      "types": "./convex/_generated/dataModel.d.ts",
+      "default": "./convex/_generated/dataModel.js"
+    }
+  },
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fitness/shared": "workspace:*",
+    "convex": "^1.17.4"
+  },
+  "devDependencies": {
+    "@fitness/tsconfig": "workspace:*",
+    "typescript": "^5.7.2"
+  }
+}

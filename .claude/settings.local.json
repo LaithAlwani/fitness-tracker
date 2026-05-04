@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(corepack prepare pnpm@9.15.0 --activate)",
+      "PowerShell(pnpm --version)",
+      "PowerShell(pnpm ls --depth=0 -r 2>&1)",
+      "PowerShell(Get-ChildItem -Path . -Force -File | Where-Object { $_.Name -eq \".npmrc\" } | Select-Object FullName; Get-ChildItem -Path \"apps\\\\mobile\" -Force -File | Where-Object { $_.Name -eq \".npmrc\" } | Select-Object FullName)",
+      "PowerShell(pnpm install 2>&1)"
+    ]
+  }
+}

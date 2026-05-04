@@ -1,0 +1,12 @@
+{
+  "extends": "@fitness/tsconfig/base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "moduleResolution": "Bundler",
+    "allowJs": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": ["convex/**/*"],
+  "exclude": ["node_modules", "convex/_generated"]
+}
