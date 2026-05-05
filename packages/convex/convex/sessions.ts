@@ -93,6 +93,76 @@ export const getActiveSession = query({
   },
 });
 
+// Lightweight summary of every finished session — used by the History tab.
+// Returns date, plan day label, exercise count, duration, and total set
+// count. Heavier "what sets exactly?" comes from getSession on tap.
+export const listFinishedSessions = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) return [];
+
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_user_started", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .collect();
+    const finished = sessions.filter((s) => s.finishedAt !== undefined);
+
+    return await Promise.all(
+      finished.map(async (session) => {
+        const planDay = session.planDayId
+          ? await ctx.db.get(session.planDayId)
+          : null;
+        const plan = planDay ? await ctx.db.get(planDay.planId) : null;
+
+        const entries = await ctx.db
+          .query("sessionEntries")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .collect();
+
+        let totalSets = 0;
+        let totalCardioLogs = 0;
+        for (const entry of entries) {
+          const sets = await ctx.db
+            .query("sets")
+            .withIndex("by_session_entry", (q) =>
+              q.eq("sessionEntryId", entry._id),
+            )
+            .collect();
+          totalSets += sets.length;
+          const cardio = await ctx.db
+            .query("cardioLogs")
+            .withIndex("by_session_entry", (q) =>
+              q.eq("sessionEntryId", entry._id),
+            )
+            .collect();
+          totalCardioLogs += cardio.length;
+        }
+
+        return {
+          _id: session._id,
+          startedAt: session.startedAt,
+          finishedAt: session.finishedAt!,
+          durationSec: Math.round(
+            (session.finishedAt! - session.startedAt) / 1000,
+          ),
+          planName: plan?.name,
+          dayName: planDay?.name,
+          exerciseCount: entries.length,
+          totalSets,
+          totalCardioLogs,
+        };
+      }),
+    );
+  },
+});
+
 export const getSession = query({
   args: { sessionId: v.id("sessions") },
   handler: async (ctx, { sessionId }) => {

@@ -10,7 +10,7 @@
 
 **Plan file:** `C:\Users\laith\.claude\plans\i-want-to-create-inherited-brooks.md` — full implementation plan with phases, schema, gamification design, and store-launch checklist. Read it before making non-trivial decisions.
 
-**Currently working on:** Phase 5 (Body metrics + units kg/lb toggle). Last sign-off: **v0.5** (Phase 4 — workout logger: sessions backend, active session screen, sets/cardio with haptics, rest timer, mid-workout exercise add).
+**Currently working on:** Phase 6 (History — completed sessions list + read-only session detail). Last sign-off: **v0.6** (Phase 5 — body metrics with bodyweight sparkline, kg/lb toggle, units helpers wired across plan/workout/target UIs).
 
 ### Stack
 
