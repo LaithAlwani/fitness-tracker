@@ -12,6 +12,9 @@
 //   - units.ts        (Phase 5)
 //   - format.ts       (Phase 5)
 
+export * from "./achievements";
 export * from "./exercises";
 export * from "./prs";
+export * from "./quests";
 export * from "./units";
+export * from "./xp";

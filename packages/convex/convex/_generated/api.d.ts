@@ -9,6 +9,7 @@
  */
 
 import type * as exercises from "../exercises.js";
+import type * as gamification from "../gamification.js";
 import type * as metrics from "../metrics.js";
 import type * as plans from "../plans.js";
 import type * as progress from "../progress.js";
@@ -23,6 +24,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   exercises: typeof exercises;
+  gamification: typeof gamification;
   metrics: typeof metrics;
   plans: typeof plans;
   progress: typeof progress;

@@ -8,6 +8,14 @@ import {
 } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 
+import { XP_REWARDS } from "@fitness/shared";
+
+import {
+  checkAchievements,
+  grantXp,
+  progressQuests,
+} from "./gamification";
+
 async function getCurrentUserOrThrow(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error("Not authenticated");
@@ -95,7 +103,7 @@ export const log = mutation({
       throw new Error("Log at least one value");
     }
 
-    return await ctx.db.insert("bodyMetrics", {
+    const id = await ctx.db.insert("bodyMetrics", {
       userId: user._id,
       recordedAt: recordedAt ?? Date.now(),
       bodyweight,
@@ -103,6 +111,14 @@ export const log = mutation({
       measurements,
       source: "manual",
     });
+
+    await grantXp(ctx, user._id, "metric_logged", XP_REWARDS.METRIC_LOGGED);
+    if (bodyweight !== undefined) {
+      await progressQuests(ctx, user._id, { type: "metric_logged" });
+    }
+    await checkAchievements(ctx, user._id);
+
+    return id;
   },
 });
 

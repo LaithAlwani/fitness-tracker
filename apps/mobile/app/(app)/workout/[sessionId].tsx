@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { api } from "@fitness/convex";
 
+import { SessionCelebrationOverlay } from "@/components/gamification/SessionCelebrationOverlay";
 import { ExercisePickerSheet } from "@/components/plans/ExercisePickerSheet";
 import { RestTimer } from "@/components/workout/RestTimer";
 import { SessionEntryCard } from "@/components/workout/SessionEntryCard";
@@ -60,6 +61,14 @@ export default function ActiveSessionScreen() {
   const [now, setNow] = useState(Date.now());
   const [restTimerKey, setRestTimerKey] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [celebration, setCelebration] = useState<{
+    xpDelta: number;
+    totalXp: number;
+    newLevel: number;
+    leveledUp: boolean;
+    questsCompleted: string[];
+    achievementsUnlocked: string[];
+  } | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -106,12 +115,25 @@ export default function ActiveSessionScreen() {
         {
           text: "Finish",
           onPress: async () => {
-            await finishSession({ sessionId: sessionId as never });
-            router.back();
+            const outcome = await finishSession({
+              sessionId: sessionId as never,
+            });
+            // If the session had no XP-worthy content, skip the overlay and
+            // just go back. Otherwise show the celebration first.
+            if (outcome.xpDelta > 0 || outcome.achievementsUnlocked.length > 0) {
+              setCelebration(outcome);
+            } else {
+              router.back();
+            }
           },
         },
       ],
     );
+  };
+
+  const handleCelebrationDismiss = () => {
+    setCelebration(null);
+    router.back();
   };
 
   const handleCancel = () => {
@@ -290,6 +312,12 @@ export default function ActiveSessionScreen() {
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onPick={(exerciseId) => handlePickExercise(exerciseId)}
+      />
+
+      <SessionCelebrationOverlay
+        visible={celebration !== null}
+        onClose={handleCelebrationDismiss}
+        outcome={celebration}
       />
     </SafeAreaView>
   );

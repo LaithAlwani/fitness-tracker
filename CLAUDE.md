@@ -10,7 +10,7 @@
 
 **Plan file:** `C:\Users\laith\.claude\plans\i-want-to-create-inherited-brooks.md` — full implementation plan with phases, schema, gamification design, and store-launch checklist. Read it before making non-trivial decisions.
 
-**Currently working on:** Phase 7 (Progress charts — pick exercise, line chart of top weight over time, PR badges for top weight/1RM/volume). Last sign-off: **v0.7** (Phase 6 — finished sessions list, pull-to-refresh, read-only detail screen with stats + delete).
+**Currently working on:** Phase 8 (Gamification — XP/levels, achievements, weekly quests, end-of-workout celebration overlay). Last sign-off: **v0.8** (Phase 7 — progress charts: exercise picker, SVG line chart, 4 PR cards, bodyweight trend).
 
 ### Stack
 
@@ -113,6 +113,7 @@ Stored in `apps/mobile/.env.local` (git-ignored) for dev. Stored as EAS secrets 
 - **Stale Metro on port 8081.** Closing a terminal mid-`expo start` on Windows often leaves an orphaned Node process holding 8081. If you get "Port 8081 is being used", run `Get-NetTCPConnection -LocalPort 8081 | Select OwningProcess` then `Stop-Process -Id <pid> -Force`. Or pass `--port 8082` to expo start.
 - **`&apos;` only works in JSX text, not in JS strings.** React/JSX decodes HTML entities inside `<Text>can&apos;t</Text>` automatically. But `Alert.alert("can&apos;t")` (and any other string passed to a native API or template literal) shows the entity literally. Always use a real apostrophe `'` in JS strings; the `react/no-unescaped-entities` lint rule only flags JSX text, not strings.
 - **NativeWind dynamic className + reactive state = re-render crash.** When a state value (e.g. user prefs from Convex) flips and triggers a re-render of an element with a *conditional* template-literal `className` (`` `${base} ${active ? "bg-white" : ""}` ``), `react-native-css-interop`'s `printUpgradeWarning` → `stringify` chain can throw, surfacing as a `getKey` error in `NavigationStateContext.js`. Switch the dynamic element to plain `style={...}` from `StyleSheet.create({...})` for the active/inactive variants. Static NativeWind classes are fine; only interpolated conditional classes that flip on reactive data are the trigger. Affected component so far: `(tabs)/profile.tsx` segmented kg/lb toggle.
+- **NativeWind opacity modifier `/N` doesn't work on custom palette colors.** `dark:bg-brand-950/30` silently fails to apply (the `bg-brand-950/30` style is dropped, falling back to whatever non-dark variant is set — often a bright color → looks like a popup in dark mode). Built-in Tailwind palette colors (`bg-neutral-900/30`) are fine. For custom colors defined in `tailwind.config.js`, use a fully opaque shade (`dark:bg-brand-950` or pick a different shade like `dark:bg-neutral-900` with a brand-colored border). Caught when the dashboard's "Recent achievements" card was rendering with `bg-brand-50` in dark mode because the `dark:bg-brand-950/30` variant didn't apply.
 
 ---
 

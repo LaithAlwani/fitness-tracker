@@ -151,6 +151,24 @@ export default function ProfileTab() {
             <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
           </View>
         </Pressable>
+
+        <Pressable
+          className={navCardStyles}
+          onPress={() => router.push("/(app)/achievements")}
+        >
+          <View className="flex-row items-center">
+            <Ionicons name="trophy-outline" size={24} color="#0ea5e9" />
+            <View className="ml-3 flex-1">
+              <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
+                Achievements
+              </Text>
+              <Text className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">
+                Badges you've unlocked from your progress
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </View>
+        </Pressable>
       </View>
 
       <View className="mt-8 px-6">
