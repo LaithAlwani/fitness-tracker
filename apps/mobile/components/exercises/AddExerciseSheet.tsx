@@ -75,8 +75,7 @@ export function AddExerciseSheet({ visible, onClose }: Props) {
       category: values.category,
       muscleGroup:
         values.muscleGroup === NONE ? undefined : values.muscleGroup,
-      equipment:
-        values.equipment === NONE ? undefined : values.equipment,
+      equipment: values.equipment === NONE ? undefined : values.equipment,
     });
     reset();
     onClose();

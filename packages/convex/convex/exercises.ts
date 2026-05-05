@@ -111,29 +111,42 @@ export const update = mutation({
   },
 });
 
-export const archive = mutation({
+// Smart delete:
+//   - If the exercise is referenced by any past session entry, soft-archive it
+//     (set archived=true) so workout history stays valid.
+//   - Otherwise, hard-delete the exercise plus any planExercises that point at
+//     it (so the user's plans don't keep dead references).
+//
+// Returns { type: "deleted" } or { type: "archived" } so the UI can give
+// honest feedback if it ever wants to.
+export const deleteExercise = mutation({
   args: { exerciseId: v.id("exercises") },
   handler: async (ctx, { exerciseId }) => {
     const user = await getCurrentUserOrThrow(ctx);
     const exercise = await ctx.db.get(exerciseId);
     if (!exercise) throw new Error("Exercise not found");
     if (exercise.userId !== user._id) {
-      throw new Error("Cannot archive a seeded exercise");
+      throw new Error("Cannot delete a seeded exercise");
     }
-    await ctx.db.patch(exerciseId, { archived: true });
-  },
-});
 
-export const restore = mutation({
-  args: { exerciseId: v.id("exercises") },
-  handler: async (ctx, { exerciseId }) => {
-    const user = await getCurrentUserOrThrow(ctx);
-    const exercise = await ctx.db.get(exerciseId);
-    if (!exercise) throw new Error("Exercise not found");
-    if (exercise.userId !== user._id) {
-      throw new Error("Cannot restore a seeded exercise");
+    const sessionEntries = await ctx.db.query("sessionEntries").collect();
+    const isUsedInHistory = sessionEntries.some(
+      (entry) => entry.exerciseId === exerciseId,
+    );
+
+    if (isUsedInHistory) {
+      await ctx.db.patch(exerciseId, { archived: true });
+      return { type: "archived" as const };
     }
-    await ctx.db.patch(exerciseId, { archived: false });
+
+    const planExercises = await ctx.db.query("planExercises").collect();
+    for (const planExercise of planExercises) {
+      if (planExercise.exerciseId === exerciseId) {
+        await ctx.db.delete(planExercise._id);
+      }
+    }
+    await ctx.db.delete(exerciseId);
+    return { type: "deleted" as const };
   },
 });
 

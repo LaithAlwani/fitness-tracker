@@ -24,6 +24,24 @@ export default function WorkoutTab() {
       <View className="mt-6 gap-3 px-6">
         <Pressable
           className={cardStyles}
+          onPress={() => router.push("/(app)/plans")}
+        >
+          <View className="flex-row items-center">
+            <Ionicons name="clipboard-outline" size={24} color="#0ea5e9" />
+            <View className="ml-3 flex-1">
+              <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
+                My plans
+              </Text>
+              <Text className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">
+                Build custom workout splits with target sets and reps
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </View>
+        </Pressable>
+
+        <Pressable
+          className={cardStyles}
           onPress={() => router.push("/(app)/exercises")}
         >
           <View className="flex-row items-center">

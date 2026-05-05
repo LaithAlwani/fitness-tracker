@@ -9,7 +9,7 @@ type ExerciseRowProps = {
   muscleGroup?: string;
   equipment?: string;
   isCustom: boolean;
-  onArchive?: () => void;
+  onDelete?: () => void;
 };
 
 const cardStyles =
@@ -28,7 +28,7 @@ export function ExerciseRow({
   muscleGroup,
   equipment,
   isCustom,
-  onArchive,
+  onDelete,
 }: ExerciseRowProps) {
   const subtitleParts = [
     formatMuscleGroup(muscleGroup),
@@ -55,9 +55,9 @@ export function ExerciseRow({
         </Text>
       </View>
 
-      {isCustom && onArchive ? (
+      {isCustom && onDelete ? (
         <Pressable
-          onPress={onArchive}
+          onPress={onDelete}
           hitSlop={8}
           className="ml-3 p-2 active:opacity-60"
         >

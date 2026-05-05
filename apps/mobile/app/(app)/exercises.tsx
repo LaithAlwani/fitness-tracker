@@ -33,7 +33,7 @@ export default function ExercisesScreen() {
   const router = useRouter();
   const exercises = useQuery(api.exercises.list, {});
   const me = useQuery(api.users.me);
-  const archiveExercise = useMutation(api.exercises.archive);
+  const deleteExercise = useMutation(api.exercises.deleteExercise);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<ExerciseCategory | null>(
@@ -55,17 +55,17 @@ export default function ExercisesScreen() {
     });
   }, [exercises, searchQuery, categoryFilter, muscleFilter]);
 
-  const handleArchive = (exerciseId: string, exerciseName: string) => {
+  const handleDelete = (exerciseId: string, exerciseName: string) => {
     Alert.alert(
-      "Archive exercise?",
-      `"${exerciseName}" will be hidden from the library. You can't undo this in v1.`,
+      "Delete exercise?",
+      `"${exerciseName}" will be removed from your library. If you've already used it in a workout, it will be hidden from the library but kept in your history.`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Archive",
+          text: "Delete",
           style: "destructive",
           onPress: () => {
-            archiveExercise({ exerciseId: exerciseId as never });
+            deleteExercise({ exerciseId: exerciseId as never });
           },
         },
       ],
@@ -176,9 +176,9 @@ export default function ExercisesScreen() {
               muscleGroup={item.muscleGroup}
               equipment={item.equipment}
               isCustom={item.userId === me?._id}
-              onArchive={
+              onDelete={
                 item.userId === me?._id
-                  ? () => handleArchive(item._id, item.name)
+                  ? () => handleDelete(item._id, item.name)
                   : undefined
               }
             />
