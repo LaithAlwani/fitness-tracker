@@ -13,4 +13,5 @@
 //   - format.ts       (Phase 5)
 
 export * from "./exercises";
+export * from "./prs";
 export * from "./units";

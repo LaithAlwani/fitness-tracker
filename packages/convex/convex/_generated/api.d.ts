@@ -11,6 +11,7 @@
 import type * as exercises from "../exercises.js";
 import type * as metrics from "../metrics.js";
 import type * as plans from "../plans.js";
+import type * as progress from "../progress.js";
 import type * as sessions from "../sessions.js";
 import type * as users from "../users.js";
 
@@ -24,6 +25,7 @@ declare const fullApi: ApiFromModules<{
   exercises: typeof exercises;
   metrics: typeof metrics;
   plans: typeof plans;
+  progress: typeof progress;
   sessions: typeof sessions;
   users: typeof users;
 }>;
