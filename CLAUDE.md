@@ -10,7 +10,7 @@
 
 **Plan file:** `C:\Users\laith\.claude\plans\i-want-to-create-inherited-brooks.md` — full implementation plan with phases, schema, gamification design, and store-launch checklist. Read it before making non-trivial decisions.
 
-**Currently working on:** Phase 3 (Plan builder — create plans, add days, populate days with exercises + targets). Last sign-off: **v0.3** (Phase 2 — exercise library with 65 seeded + custom add/archive).
+**Currently working on:** Phase 4 (Workout logger — the core flow: start a session from a plan day or freeform, log sets/cardio, rest timer, finish). Last sign-off: **v0.4** (Phase 3 — plan builder with full CRUD, smart delete, day inline rename, exercise picker with category + muscle filters).
 
 ### Stack
 
@@ -111,6 +111,7 @@ Stored in `apps/mobile/.env.local` (git-ignored) for dev. Stored as EAS secrets 
 
 - **pnpm + Expo node_modules layout.** The repo root `.npmrc` sets `node-linker=hoisted` because Metro's resolver cannot navigate pnpm's default isolated/symlinked layout — NativeWind imports `react-native-css-interop/jsx-runtime` and Reanimated worklets need transitive deps Metro can find directly. Don't remove that .npmrc. If you ever see `Unable to resolve module react-native-css-interop` or similar transitive-resolution errors, re-check the root .npmrc and that all `node_modules/` are wiped + reinstalled.
 - **Stale Metro on port 8081.** Closing a terminal mid-`expo start` on Windows often leaves an orphaned Node process holding 8081. If you get "Port 8081 is being used", run `Get-NetTCPConnection -LocalPort 8081 | Select OwningProcess` then `Stop-Process -Id <pid> -Force`. Or pass `--port 8082` to expo start.
+- **`&apos;` only works in JSX text, not in JS strings.** React/JSX decodes HTML entities inside `<Text>can&apos;t</Text>` automatically. But `Alert.alert("can&apos;t")` (and any other string passed to a native API or template literal) shows the entity literally. Always use a real apostrophe `'` in JS strings; the `react/no-unescaped-entities` lint rule only flags JSX text, not strings.
 
 ---
 

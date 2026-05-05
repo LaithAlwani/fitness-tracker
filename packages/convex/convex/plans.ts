@@ -123,6 +123,60 @@ export const getPlan = query({
   },
 });
 
+// Flat list of every (plan, day) pair the user has, used by the workout
+// start picker so the user can tap straight into a specific day.
+export const listAvailablePlanDays = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) return [];
+
+    const plans = await ctx.db
+      .query("plans")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    const activePlans = plans
+      .filter((plan) => !plan.archived)
+      .sort((a, b) => b.createdAt - a.createdAt);
+
+    const result: Array<{
+      planId: Id<"plans">;
+      planName: string;
+      dayId: Id<"planDays">;
+      dayName: string;
+      exerciseCount: number;
+    }> = [];
+
+    for (const plan of activePlans) {
+      const days = await ctx.db
+        .query("planDays")
+        .withIndex("by_plan", (q) => q.eq("planId", plan._id))
+        .collect();
+      const sortedDays = days.sort((a, b) => a.order - b.order);
+      for (const day of sortedDays) {
+        const planExercises = await ctx.db
+          .query("planExercises")
+          .withIndex("by_plan_day", (q) => q.eq("planDayId", day._id))
+          .collect();
+        result.push({
+          planId: plan._id,
+          planName: plan.name,
+          dayId: day._id,
+          dayName: day.name,
+          exerciseCount: planExercises.length,
+        });
+      }
+    }
+
+    return result;
+  },
+});
+
 // ----- Plan mutations -----
 
 export const createPlan = mutation({
