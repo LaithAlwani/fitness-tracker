@@ -2,7 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
-import { formatMuscleGroup } from "@fitness/shared";
+import { formatMuscleGroup, formatWeight, type WeightUnit } from "@fitness/shared";
+
+import { useUnits } from "@/lib/useUnits";
 
 type DayCardExercise = {
   _id: string;
@@ -44,7 +46,7 @@ const iconButtonStyles = "p-1.5 active:opacity-60";
 const addExerciseButtonStyles =
   "mt-2 flex-row items-center justify-center rounded-xl border border-dashed border-neutral-300 dark:border-neutral-700 px-3 py-3 active:bg-neutral-50 dark:active:bg-neutral-800";
 
-function formatTargets(exercise: DayCardExercise): string {
+function formatTargets(exercise: DayCardExercise, units: WeightUnit): string {
   if (exercise.category === "strength") {
     const parts: string[] = [];
     if (exercise.targetSets !== undefined) {
@@ -63,7 +65,7 @@ function formatTargets(exercise: DayCardExercise): string {
       parts.push(`${exercise.targetRepsMin} reps`);
     }
     if (exercise.targetWeight !== undefined) {
-      parts.push(`${exercise.targetWeight} kg`);
+      parts.push(formatWeight(exercise.targetWeight, units));
     }
     return parts.length > 0 ? parts.join(" · ") : "No targets";
   }
@@ -93,6 +95,7 @@ export function DayCard({
   onEditExercise,
   onRemoveExercise,
 }: DayCardProps) {
+  const units = useUnits();
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState(name);
 
@@ -182,7 +185,7 @@ export function DayCard({
                   className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400"
                   numberOfLines={1}
                 >
-                  {formatTargets(exercise)}
+                  {formatTargets(exercise, units)}
                   {exercise.muscleGroup
                     ? ` · ${formatMuscleGroup(exercise.muscleGroup)}`
                     : ""}

@@ -11,9 +11,11 @@ import {
 } from "react-native";
 
 import { api } from "@fitness/convex";
+import { formatWeightValue, parseWeightInputToKg } from "@fitness/shared";
 
 import { AuthButton } from "@/components/auth/AuthButton";
 import { AuthInput } from "@/components/auth/AuthInput";
+import { useUnits } from "@/lib/useUnits";
 
 type Props = {
   visible: boolean;
@@ -40,6 +42,7 @@ export function ExerciseTargetsSheet({
   initialTargets,
 }: Props) {
   const updatePlanExercise = useMutation(api.plans.updatePlanExercise);
+  const units = useUnits();
 
   const [sets, setSets] = useState("");
   const [repsMin, setRepsMin] = useState("");
@@ -54,7 +57,11 @@ export function ExerciseTargetsSheet({
     setSets(initialTargets.targetSets?.toString() ?? "");
     setRepsMin(initialTargets.targetRepsMin?.toString() ?? "");
     setRepsMax(initialTargets.targetRepsMax?.toString() ?? "");
-    setWeight(initialTargets.targetWeight?.toString() ?? "");
+    setWeight(
+      initialTargets.targetWeight !== undefined
+        ? formatWeightValue(initialTargets.targetWeight, units)
+        : "",
+    );
     setDurationMin(
       initialTargets.targetDurationSec
         ? Math.round(initialTargets.targetDurationSec / 60).toString()
@@ -65,7 +72,7 @@ export function ExerciseTargetsSheet({
         ? (initialTargets.targetDistanceM / 1000).toString()
         : "",
     );
-  }, [visible, initialTargets]);
+  }, [visible, initialTargets, units]);
 
   const parseNumeric = (value: string): number | undefined => {
     const trimmed = value.trim();
@@ -87,7 +94,7 @@ export function ExerciseTargetsSheet({
         targetSets: parseNumeric(sets),
         targetRepsMin: parseNumeric(repsMin),
         targetRepsMax: parseNumeric(repsMax),
-        targetWeight: parseNumeric(weight),
+        targetWeight: parseWeightInputToKg(weight, units),
         targetDurationSec:
           durationMinutes !== undefined
             ? Math.round(durationMinutes * 60)
@@ -159,10 +166,10 @@ export function ExerciseTargetsSheet({
                     </View>
                   </View>
                   <AuthInput
-                    label="Target weight"
+                    label={`Target weight (${units})`}
                     value={weight}
                     onChangeText={setWeight}
-                    placeholder="60"
+                    placeholder={units === "kg" ? "60" : "135"}
                     keyboardType="decimal-pad"
                   />
                 </>

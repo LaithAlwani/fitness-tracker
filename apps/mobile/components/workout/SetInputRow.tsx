@@ -1,13 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
+import { formatWeightValue, parseWeightInputToKg } from "@fitness/shared";
+
 import { lightTap, successFeedback } from "@/lib/haptics";
+import { useUnits } from "@/lib/useUnits";
 
 type Props = {
   defaultReps?: number;
-  defaultWeight?: number;
-  onLog: (reps: number, weight: number) => Promise<void>;
+  defaultWeightKg?: number;
+  onLog: (reps: number, weightKg: number) => Promise<void>;
 };
 
 const numericInputStyles =
@@ -15,24 +18,41 @@ const numericInputStyles =
 const labelStyles =
   "mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400 text-center";
 
-export function SetInputRow({ defaultReps, defaultWeight, onLog }: Props) {
+export function SetInputRow({ defaultReps, defaultWeightKg, onLog }: Props) {
+  const units = useUnits();
+
+  // Convert the canonical kg default into the user's unit for the placeholder
+  // and prefilled value shown in the input.
+  const defaultWeightDisplay =
+    defaultWeightKg !== undefined
+      ? formatWeightValue(defaultWeightKg, units)
+      : "";
+
   const [reps, setReps] = useState(defaultReps?.toString() ?? "");
-  const [weight, setWeight] = useState(defaultWeight?.toString() ?? "");
+  const [weight, setWeight] = useState(defaultWeightDisplay);
   const [isLogging, setIsLogging] = useState(false);
+
+  // Re-sync when the user changes units mid-session, or when the previous-set
+  // defaults change because a new set was just logged.
+  useEffect(() => {
+    setReps(defaultReps?.toString() ?? "");
+    setWeight(defaultWeightDisplay);
+  }, [defaultReps, defaultWeightDisplay]);
 
   const handleLog = async () => {
     const repsNumber = Number(reps.trim());
-    const weightNumber = Number(weight.trim());
     if (!Number.isFinite(repsNumber) || repsNumber <= 0) return;
-    if (!Number.isFinite(weightNumber) || weightNumber < 0) return;
+
+    const weightKg = parseWeightInputToKg(weight, units);
+    if (weightKg === undefined) return;
 
     setIsLogging(true);
     lightTap();
     try {
-      await onLog(repsNumber, weightNumber);
+      await onLog(repsNumber, weightKg);
       successFeedback();
       setReps(defaultReps?.toString() ?? "");
-      setWeight(defaultWeight?.toString() ?? "");
+      setWeight(defaultWeightDisplay);
     } finally {
       setIsLogging(false);
     }
@@ -53,12 +73,12 @@ export function SetInputRow({ defaultReps, defaultWeight, onLog }: Props) {
         />
       </View>
       <View className="flex-1">
-        <Text className={labelStyles}>Weight (kg)</Text>
+        <Text className={labelStyles}>Weight ({units})</Text>
         <TextInput
           className={`${numericInputStyles} h-12`}
           value={weight}
           onChangeText={setWeight}
-          placeholder={defaultWeight?.toString() ?? "0"}
+          placeholder={defaultWeightDisplay || "0"}
           placeholderTextColor="#9ca3af"
           keyboardType="decimal-pad"
           returnKeyType="done"

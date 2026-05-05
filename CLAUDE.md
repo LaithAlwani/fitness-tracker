@@ -10,7 +10,7 @@
 
 **Plan file:** `C:\Users\laith\.claude\plans\i-want-to-create-inherited-brooks.md` — full implementation plan with phases, schema, gamification design, and store-launch checklist. Read it before making non-trivial decisions.
 
-**Currently working on:** Phase 4 (Workout logger — the core flow: start a session from a plan day or freeform, log sets/cardio, rest timer, finish). Last sign-off: **v0.4** (Phase 3 — plan builder with full CRUD, smart delete, day inline rename, exercise picker with category + muscle filters).
+**Currently working on:** Phase 5 (Body metrics + units kg/lb toggle). Last sign-off: **v0.5** (Phase 4 — workout logger: sessions backend, active session screen, sets/cardio with haptics, rest timer, mid-workout exercise add).
 
 ### Stack
 
@@ -112,6 +112,7 @@ Stored in `apps/mobile/.env.local` (git-ignored) for dev. Stored as EAS secrets 
 - **pnpm + Expo node_modules layout.** The repo root `.npmrc` sets `node-linker=hoisted` because Metro's resolver cannot navigate pnpm's default isolated/symlinked layout — NativeWind imports `react-native-css-interop/jsx-runtime` and Reanimated worklets need transitive deps Metro can find directly. Don't remove that .npmrc. If you ever see `Unable to resolve module react-native-css-interop` or similar transitive-resolution errors, re-check the root .npmrc and that all `node_modules/` are wiped + reinstalled.
 - **Stale Metro on port 8081.** Closing a terminal mid-`expo start` on Windows often leaves an orphaned Node process holding 8081. If you get "Port 8081 is being used", run `Get-NetTCPConnection -LocalPort 8081 | Select OwningProcess` then `Stop-Process -Id <pid> -Force`. Or pass `--port 8082` to expo start.
 - **`&apos;` only works in JSX text, not in JS strings.** React/JSX decodes HTML entities inside `<Text>can&apos;t</Text>` automatically. But `Alert.alert("can&apos;t")` (and any other string passed to a native API or template literal) shows the entity literally. Always use a real apostrophe `'` in JS strings; the `react/no-unescaped-entities` lint rule only flags JSX text, not strings.
+- **NativeWind dynamic className + reactive state = re-render crash.** When a state value (e.g. user prefs from Convex) flips and triggers a re-render of an element with a *conditional* template-literal `className` (`` `${base} ${active ? "bg-white" : ""}` ``), `react-native-css-interop`'s `printUpgradeWarning` → `stringify` chain can throw, surfacing as a `getKey` error in `NavigationStateContext.js`. Switch the dynamic element to plain `style={...}` from `StyleSheet.create({...})` for the active/inactive variants. Static NativeWind classes are fine; only interpolated conditional classes that flip on reactive data are the trigger. Affected component so far: `(tabs)/profile.tsx` segmented kg/lb toggle.
 
 ---
 

@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
 
-import { formatMuscleGroup } from "@fitness/shared";
+import { formatMuscleGroup, formatWeight, type WeightUnit } from "@fitness/shared";
 
+import { useUnits } from "@/lib/useUnits";
 import { CardioEntry } from "@/components/workout/CardioEntry";
 import { SetInputRow } from "@/components/workout/SetInputRow";
 import { SetRow } from "@/components/workout/SetRow";
@@ -48,7 +49,7 @@ type Props = {
 const cardStyles =
   "rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4";
 
-function formatTargetLine(props: Props): string {
+function formatTargetLine(props: Props, units: WeightUnit): string {
   if (props.category === "strength") {
     const parts: string[] = [];
     if (props.targetSets !== undefined) parts.push(`${props.targetSets} sets`);
@@ -63,7 +64,7 @@ function formatTargetLine(props: Props): string {
       );
     }
     if (props.targetWeight !== undefined) {
-      parts.push(`${props.targetWeight} kg`);
+      parts.push(formatWeight(props.targetWeight, units));
     }
     return parts.length > 0 ? `Target: ${parts.join(" · ")}` : "";
   }
@@ -81,7 +82,8 @@ function formatTargetLine(props: Props): string {
 }
 
 export function SessionEntryCard(props: Props) {
-  const targetLine = formatTargetLine(props);
+  const units = useUnits();
+  const targetLine = formatTargetLine(props, units);
   const lastCompletedSet = [...props.sets]
     .reverse()
     .find((set) => set.completed);
@@ -139,7 +141,7 @@ export function SessionEntryCard(props: Props) {
 
           <SetInputRow
             defaultReps={defaultReps}
-            defaultWeight={defaultWeight}
+            defaultWeightKg={defaultWeight}
             onLog={props.onLogSet}
           />
         </>

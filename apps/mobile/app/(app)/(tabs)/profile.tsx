@@ -1,22 +1,76 @@
 import { useAuth } from "@clerk/clerk-expo";
-import { useQuery } from "convex/react";
+import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQuery } from "convex/react";
+import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, useColorScheme, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { api } from "@fitness/convex";
 
 const cardStyles =
   "rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5";
+const navCardStyles =
+  "rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 active:bg-neutral-50 dark:active:bg-neutral-800";
 const labelStyles =
   "text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400";
-const valueStyles =
-  "mt-1 text-base text-neutral-900 dark:text-neutral-50";
+const valueStyles = "mt-1 text-base text-neutral-900 dark:text-neutral-50";
+
+// Segmented toggle uses StyleSheet (not NativeWind) for the active/inactive
+// state. Reason: NativeWind's css-interop runtime has a known issue where
+// rapid re-renders with conditional className strings on the same element
+// trigger an upgrade-warning crash through React Navigation's context.
+const segmentSheet = StyleSheet.create({
+  base: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    paddingVertical: 8,
+  },
+  activeLight: {
+    backgroundColor: "#ffffff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  activeDark: {
+    backgroundColor: "#171717",
+  },
+  label: { fontSize: 14, fontWeight: "600" },
+  labelActiveLight: { color: "#0a0a0a" },
+  labelActiveDark: { color: "#fafafa" },
+  labelInactiveLight: { color: "#737373" },
+  labelInactiveDark: { color: "#a3a3a3" },
+});
 
 export default function ProfileTab() {
+  const router = useRouter();
   const { signOut } = useAuth();
   const currentUser = useQuery(api.users.me);
+  const setUnits = useMutation(api.users.setUnits);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const isDark = useColorScheme() === "dark";
+
+  const units = currentUser?.units ?? "kg";
+
+  const buildSegmentStyles = (selected: boolean) => {
+    if (!selected) return segmentSheet.base;
+    return [segmentSheet.base, isDark ? segmentSheet.activeDark : segmentSheet.activeLight];
+  };
+
+  const buildLabelStyles = (selected: boolean) => {
+    const color = selected
+      ? isDark
+        ? segmentSheet.labelActiveDark
+        : segmentSheet.labelActiveLight
+      : isDark
+        ? segmentSheet.labelInactiveDark
+        : segmentSheet.labelInactiveLight;
+    return [segmentSheet.label, color];
+  };
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -27,6 +81,11 @@ export default function ProfileTab() {
     } finally {
       setIsSigningOut(false);
     }
+  };
+
+  const handleSetUnits = async (next: "kg" | "lb") => {
+    if (next === units) return;
+    await setUnits({ units: next });
   };
 
   return (
@@ -54,11 +113,44 @@ export default function ProfileTab() {
         </View>
 
         <View className={cardStyles}>
-          <Text className={labelStyles}>Units</Text>
-          <Text className={valueStyles}>
-            {currentUser?.units === "lb" ? "Pounds (lb)" : "Kilograms (kg)"}
-          </Text>
+          <Text className={labelStyles}>Weight units</Text>
+          <View className="mt-3 flex-row rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800">
+            <Pressable
+              onPress={() => handleSetUnits("kg")}
+              style={buildSegmentStyles(units === "kg")}
+            >
+              <Text style={buildLabelStyles(units === "kg")}>
+                Kilograms (kg)
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleSetUnits("lb")}
+              style={buildSegmentStyles(units === "lb")}
+            >
+              <Text style={buildLabelStyles(units === "lb")}>
+                Pounds (lb)
+              </Text>
+            </Pressable>
+          </View>
         </View>
+
+        <Pressable
+          className={navCardStyles}
+          onPress={() => router.push("/(app)/metrics")}
+        >
+          <View className="flex-row items-center">
+            <Ionicons name="scale-outline" size={24} color="#0ea5e9" />
+            <View className="ml-3 flex-1">
+              <Text className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
+                Body metrics
+              </Text>
+              <Text className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">
+                Track bodyweight and measurements over time
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </View>
+        </Pressable>
       </View>
 
       <View className="mt-8 px-6">
