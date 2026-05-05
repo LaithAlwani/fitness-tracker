@@ -10,7 +10,7 @@
 
 **Plan file:** `C:\Users\laith\.claude\plans\i-want-to-create-inherited-brooks.md` — full implementation plan with phases, schema, gamification design, and store-launch checklist. Read it before making non-trivial decisions.
 
-**Currently working on:** Phase 8 (Gamification — XP/levels, achievements, weekly quests, end-of-workout celebration overlay). Last sign-off: **v0.8** (Phase 7 — progress charts: exercise picker, SVG line chart, 4 PR cards, bodyweight trend).
+**Currently working on:** Phase 9 (Polish — local notifications, daily reminder settings, empty-state polish). Last sign-off: **v0.9** (Phase 8 — gamification engine: XP/levels, 14 achievements, 12 weekly quests, dashboard rebuild, celebration overlay).
 
 ### Stack
 

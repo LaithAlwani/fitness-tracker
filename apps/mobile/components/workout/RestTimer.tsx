@@ -3,6 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { warningFeedback } from "@/lib/haptics";
+import {
+  cancelRestTimerNotification,
+  scheduleRestTimerNotification,
+} from "@/lib/notifications";
 
 type Props = {
   initialSeconds: number;
@@ -18,6 +22,27 @@ function formatSeconds(total: number): string {
 export function RestTimer({ initialSeconds, onDismiss }: Props) {
   const [remaining, setRemaining] = useState(initialSeconds);
   const firedHapticRef = useRef(false);
+  const notificationIdRef = useRef<string | null>(null);
+
+  // Schedule a lock-screen notification for the initial countdown. If the
+  // user adjusts the timer (±15s), or dismisses it, we cancel + reschedule.
+  useEffect(() => {
+    let isMounted = true;
+    scheduleRestTimerNotification(initialSeconds).then((id) => {
+      if (isMounted) {
+        notificationIdRef.current = id;
+      } else {
+        // Component unmounted before the schedule resolved — clean up.
+        cancelRestTimerNotification(id);
+      }
+    });
+    return () => {
+      isMounted = false;
+      cancelRestTimerNotification(notificationIdRef.current);
+      notificationIdRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (remaining <= 0) return;
@@ -34,14 +59,36 @@ export function RestTimer({ initialSeconds, onDismiss }: Props) {
     }
   }, [remaining]);
 
+  const reschedule = async (newSeconds: number) => {
+    await cancelRestTimerNotification(notificationIdRef.current);
+    if (newSeconds <= 0) {
+      notificationIdRef.current = null;
+      return;
+    }
+    notificationIdRef.current = await scheduleRestTimerNotification(newSeconds);
+  };
+
+  const handleAdjust = (deltaSeconds: number) => {
+    const next = Math.max(0, remaining + deltaSeconds);
+    setRemaining(next);
+    if (next > 0) {
+      firedHapticRef.current = false;
+    }
+    reschedule(next);
+  };
+
+  const handleDismiss = () => {
+    cancelRestTimerNotification(notificationIdRef.current);
+    notificationIdRef.current = null;
+    onDismiss();
+  };
+
   const isDone = remaining === 0;
 
   return (
     <View
       className={`flex-row items-center justify-between rounded-2xl px-4 py-3 ${
-        isDone
-          ? "bg-green-500"
-          : "bg-brand-500"
+        isDone ? "bg-green-500" : "bg-brand-500"
       }`}
     >
       <View className="flex-row items-center">
@@ -62,7 +109,7 @@ export function RestTimer({ initialSeconds, onDismiss }: Props) {
       <View className="flex-row items-center gap-2">
         {!isDone ? (
           <Pressable
-            onPress={() => setRemaining((value) => Math.max(0, value - 15))}
+            onPress={() => handleAdjust(-15)}
             hitSlop={6}
             className="rounded-full bg-white/20 px-2 py-1 active:opacity-70"
           >
@@ -71,14 +118,18 @@ export function RestTimer({ initialSeconds, onDismiss }: Props) {
         ) : null}
         {!isDone ? (
           <Pressable
-            onPress={() => setRemaining((value) => value + 15)}
+            onPress={() => handleAdjust(15)}
             hitSlop={6}
             className="rounded-full bg-white/20 px-2 py-1 active:opacity-70"
           >
             <Text className="text-xs font-bold text-white">+15</Text>
           </Pressable>
         ) : null}
-        <Pressable onPress={onDismiss} hitSlop={6} className="ml-1 p-1 active:opacity-70">
+        <Pressable
+          onPress={handleDismiss}
+          hitSlop={6}
+          className="ml-1 p-1 active:opacity-70"
+        >
           <Ionicons name="close" size={20} color="white" />
         </Pressable>
       </View>

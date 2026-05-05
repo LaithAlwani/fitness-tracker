@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, FlatList, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { api } from "@fitness/convex";
@@ -52,6 +52,14 @@ export default function HistoryTab() {
           <Text className="mt-1 text-center text-sm text-neutral-500 dark:text-neutral-400">
             Finished sessions will show up here.
           </Text>
+          <Pressable
+            onPress={() => router.push("/(app)/(tabs)/workout")}
+            className="mt-6 rounded-xl bg-brand-500 active:bg-brand-600 px-6 py-3"
+          >
+            <Text className="text-sm font-semibold text-white">
+              Start a workout
+            </Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList

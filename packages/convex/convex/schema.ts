@@ -9,6 +9,11 @@ export default defineSchema({
     lastName: v.string(),
     units: v.union(v.literal("kg"), v.literal("lb")),
     createdAt: v.number(),
+    // Notification preferences (added in Phase 9). All optional so existing
+    // user rows from earlier phases stay valid.
+    dailyReminderEnabled: v.optional(v.boolean()),
+    dailyReminderHour: v.optional(v.number()), // 0-23
+    dailyReminderMinute: v.optional(v.number()), // 0-59
   }).index("by_clerk_id", ["clerkId"]),
 
   exercises: defineTable({

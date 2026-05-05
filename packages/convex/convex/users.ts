@@ -75,3 +75,35 @@ export const setUnits = mutation({
     await ctx.db.patch(user._id, { units });
   },
 });
+
+export const setDailyReminder = mutation({
+  args: {
+    enabled: v.boolean(),
+    hour: v.optional(v.number()),
+    minute: v.optional(v.number()),
+  },
+  handler: async (ctx, { enabled, hour, minute }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) throw new Error("User row missing");
+
+    const patch: {
+      dailyReminderEnabled: boolean;
+      dailyReminderHour?: number;
+      dailyReminderMinute?: number;
+    } = { dailyReminderEnabled: enabled };
+    if (hour !== undefined) {
+      if (hour < 0 || hour > 23) throw new Error("hour must be 0-23");
+      patch.dailyReminderHour = hour;
+    }
+    if (minute !== undefined) {
+      if (minute < 0 || minute > 59) throw new Error("minute must be 0-59");
+      patch.dailyReminderMinute = minute;
+    }
+    await ctx.db.patch(user._id, patch);
+  },
+});
