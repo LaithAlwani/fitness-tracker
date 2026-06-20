@@ -74,6 +74,7 @@ http.route({
           ? sub.current_period_end * 1000
           : undefined,
         trialEndsAt: sub.trial_end ? sub.trial_end * 1000 : undefined,
+        cancelAtPeriodEnd: sub.cancel_at_period_end,
       });
     }
 

@@ -64,20 +64,44 @@ export const createCheckoutSession = action({
   },
 });
 
-// Stripe-hosted billing portal to manage / cancel.
-export const createPortalSession = action({
-  args: { appUrl: v.string() },
-  handler: async (ctx, { appUrl }): Promise<{ url: string }> => {
+// In-app cancellation — cancels at the end of the paid period (keeps access
+// until then). The webhook reconciles; we also update optimistically.
+export const cancelSubscription = action({
+  args: {},
+  handler: async (ctx): Promise<void> => {
     const user = await ctx.runQuery(api.users.me, {});
-    if (!user?.stripeCustomerId) {
-      throw new Error("No subscription to manage yet.");
-    }
+    if (!user?.stripeSubscriptionId) throw new Error("No active subscription.");
     const stripe = getStripe();
-    const session = await stripe.billingPortal.sessions.create({
-      customer: user.stripeCustomerId,
-      return_url: `${appUrl}/settings`,
+    await stripe.subscriptions.update(user.stripeSubscriptionId, {
+      cancel_at_period_end: true,
     });
-    return { url: session.url };
+    await ctx.runMutation(internal.billing.setCancelAtPeriodEnd, {
+      userId: user._id,
+      cancelAtPeriodEnd: true,
+    });
+  },
+});
+
+export const resumeSubscription = action({
+  args: {},
+  handler: async (ctx): Promise<void> => {
+    const user = await ctx.runQuery(api.users.me, {});
+    if (!user?.stripeSubscriptionId) throw new Error("No subscription.");
+    const stripe = getStripe();
+    await stripe.subscriptions.update(user.stripeSubscriptionId, {
+      cancel_at_period_end: false,
+    });
+    await ctx.runMutation(internal.billing.setCancelAtPeriodEnd, {
+      userId: user._id,
+      cancelAtPeriodEnd: false,
+    });
+  },
+});
+
+export const setCancelAtPeriodEnd = internalMutation({
+  args: { userId: v.id("users"), cancelAtPeriodEnd: v.boolean() },
+  handler: async (ctx, { userId, cancelAtPeriodEnd }) => {
+    await ctx.db.patch(userId, { cancelAtPeriodEnd });
   },
 });
 
@@ -96,6 +120,7 @@ export const applySubscription = internalMutation({
     status: subscriptionStatus,
     currentPeriodEnd: v.optional(v.number()),
     trialEndsAt: v.optional(v.number()),
+    cancelAtPeriodEnd: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db
@@ -112,6 +137,9 @@ export const applySubscription = internalMutation({
         args.stripeSubscriptionId ?? user.stripeSubscriptionId,
       currentPeriodEnd: args.currentPeriodEnd ?? user.currentPeriodEnd,
       ...(args.trialEndsAt !== undefined ? { trialEndsAt: args.trialEndsAt } : {}),
+      ...(args.cancelAtPeriodEnd !== undefined
+        ? { cancelAtPeriodEnd: args.cancelAtPeriodEnd }
+        : {}),
     });
   },
 });
