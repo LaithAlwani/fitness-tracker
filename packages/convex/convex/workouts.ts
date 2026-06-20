@@ -3,11 +3,14 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getCurrentUser, getCurrentUserOrThrow, requireAccess } from "./model";
 
-const exerciseEntry = v.object({
-  name: v.string(),
-  sets: v.number(),
+const setEntry = v.object({
   reps: v.number(),
   weight: v.number(),
+});
+
+const exerciseEntry = v.object({
+  name: v.string(),
+  sets: v.array(setEntry),
 });
 
 export const create = mutation({
@@ -23,14 +26,18 @@ export const create = mutation({
     const cleaned = exercises
       .map((e) => ({
         name: e.name.trim(),
-        sets: Math.max(0, Math.round(e.sets)),
-        reps: Math.max(0, Math.round(e.reps)),
-        weight: Math.max(0, e.weight),
+        sets: e.sets
+          .map((s) => ({
+            reps: Math.max(0, Math.round(s.reps)),
+            weight: Math.max(0, s.weight),
+          }))
+          // keep a set if it records reps or weight (weight 0 = bodyweight)
+          .filter((s) => s.reps > 0 || s.weight > 0),
       }))
-      .filter((e) => e.name.length > 0);
+      .filter((e) => e.name.length > 0 && e.sets.length > 0);
 
     if (cleaned.length === 0) {
-      throw new Error("Add at least one exercise");
+      throw new Error("Add at least one exercise with a set");
     }
 
     return await ctx.db.insert("workouts", {

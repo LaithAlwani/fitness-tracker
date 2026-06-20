@@ -8,21 +8,18 @@ import {
   MagnifyingGlass,
   Plus,
   Trash,
+  X,
   Check,
   FloppyDisk,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 
-type Entry = {
-  id: string;
-  name: string;
-  sets: number;
-  reps: number;
-  weight: number;
-};
+type SetRow = { id: string; reps: string; weight: string };
+type Entry = { id: string; name: string; sets: SetRow[] };
 
 let counter = 0;
-const uid = () => `e${counter++}`;
+const uid = () => `r${counter++}`;
+const toNum = (s: string) => (s.trim() === "" ? 0 : Number(s));
 
 const inputBase =
   "rounded-xl border border-border bg-background px-3 text-base text-foreground " +
@@ -40,21 +37,58 @@ export default function LogWorkoutPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const unit = me?.units ?? "kg";
+  const unit = me?.units ?? "lb";
 
   function addExercise(exName: string) {
     setEntries((prev) => {
       if (prev.some((e) => e.name.toLowerCase() === exName.toLowerCase())) {
         return prev;
       }
-      return [...prev, { id: uid(), name: exName, sets: 3, reps: 10, weight: 0 }];
+      return [
+        ...prev,
+        { id: uid(), name: exName, sets: [{ id: uid(), reps: "", weight: "" }] },
+      ];
     });
   }
-  function updateEntry(id: string, patch: Partial<Entry>) {
-    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
-  }
-  function removeEntry(id: string) {
+  function removeExercise(id: string) {
     setEntries((prev) => prev.filter((e) => e.id !== id));
+  }
+  function addSet(entryId: string) {
+    setEntries((prev) =>
+      prev.map((e) => {
+        if (e.id !== entryId) return e;
+        const last = e.sets[e.sets.length - 1];
+        // Pre-fill with the previous set's numbers; user tweaks what changed.
+        const next: SetRow = {
+          id: uid(),
+          reps: last?.reps ?? "",
+          weight: last?.weight ?? "",
+        };
+        return { ...e, sets: [...e.sets, next] };
+      }),
+    );
+  }
+  function updateSet(entryId: string, setId: string, patch: Partial<SetRow>) {
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.id !== entryId
+          ? e
+          : {
+              ...e,
+              sets: e.sets.map((s) => (s.id === setId ? { ...s, ...patch } : s)),
+            },
+      ),
+    );
+  }
+  function removeSet(entryId: string, setId: string) {
+    setEntries((prev) =>
+      prev.flatMap((e) => {
+        if (e.id !== entryId) return [e];
+        const sets = e.sets.filter((s) => s.id !== setId);
+        // Removing the last set removes the exercise.
+        return sets.length === 0 ? [] : [{ ...e, sets }];
+      }),
+    );
   }
 
   async function save() {
@@ -67,11 +101,12 @@ export default function LogWorkoutPage() {
     try {
       await create({
         name,
-        exercises: entries.map(({ name, sets, reps, weight }) => ({
-          name,
-          sets,
-          reps,
-          weight,
+        exercises: entries.map((e) => ({
+          name: e.name,
+          sets: e.sets.map((s) => ({
+            reps: toNum(s.reps),
+            weight: toNum(s.weight),
+          })),
         })),
       });
       router.push("/");
@@ -104,7 +139,7 @@ export default function LogWorkoutPage() {
 
       {/* Current workout */}
       {entries.length > 0 && (
-        <section className="flex flex-col gap-2">
+        <section className="flex flex-col gap-3">
           {entries.map((entry) => (
             <div
               key={entry.id}
@@ -113,30 +148,68 @@ export default function LogWorkoutPage() {
               <div className="flex items-center justify-between">
                 <p className="font-medium">{entry.name}</p>
                 <button
-                  onClick={() => removeEntry(entry.id)}
+                  onClick={() => removeExercise(entry.id)}
                   aria-label={`Remove ${entry.name}`}
                   className="text-muted-foreground transition-colors hover:text-red-600"
                 >
                   <Trash className="size-4" />
                 </button>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-3">
-                <NumberField
-                  label="Sets"
-                  value={entry.sets}
-                  onChange={(v) => updateEntry(entry.id, { sets: v })}
-                />
-                <NumberField
-                  label="Reps"
-                  value={entry.reps}
-                  onChange={(v) => updateEntry(entry.id, { reps: v })}
-                />
-                <NumberField
-                  label={`Weight (${unit})`}
-                  value={entry.weight}
-                  step="0.5"
-                  onChange={(v) => updateEntry(entry.id, { weight: v })}
-                />
+
+              {/* Sets */}
+              <div className="mt-3 flex flex-col gap-2">
+                <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+                  <span className="w-10">Set</span>
+                  <span className="flex-1">Reps</span>
+                  <span className="flex-1">Weight ({unit})</span>
+                  <span className="w-7" />
+                </div>
+                {entry.sets.map((s, i) => (
+                  <div key={s.id} className="flex items-center gap-2">
+                    <span className="w-10 text-sm font-medium tabular-nums text-muted-foreground">
+                      {i + 1}
+                    </span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      placeholder="0"
+                      value={s.reps}
+                      onChange={(e) =>
+                        updateSet(entry.id, s.id, { reps: e.target.value })
+                      }
+                      aria-label={`Set ${i + 1} reps`}
+                      className={`h-11 w-full flex-1 tabular-nums ${inputBase}`}
+                    />
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.5"
+                      min="0"
+                      placeholder="0"
+                      value={s.weight}
+                      onChange={(e) =>
+                        updateSet(entry.id, s.id, { weight: e.target.value })
+                      }
+                      aria-label={`Set ${i + 1} weight`}
+                      className={`h-11 w-full flex-1 tabular-nums ${inputBase}`}
+                    />
+                    <button
+                      onClick={() => removeSet(entry.id, s.id)}
+                      aria-label={`Remove set ${i + 1}`}
+                      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => addSet(entry.id)}
+                  className="mt-1 inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1.5 text-sm font-medium text-accent-strong transition-colors hover:bg-accent/10"
+                >
+                  <Plus weight="bold" className="size-4" />
+                  Add set
+                </button>
               </div>
             </div>
           ))}
@@ -215,32 +288,5 @@ export default function LogWorkoutPage() {
         )}
       </section>
     </div>
-  );
-}
-
-function NumberField({
-  label,
-  value,
-  onChange,
-  step,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  step?: string;
-}) {
-  return (
-    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-      {label}
-      <input
-        type="number"
-        inputMode="decimal"
-        step={step ?? "1"}
-        min="0"
-        value={value}
-        onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
-        className={`h-11 tabular-nums ${inputBase}`}
-      />
-    </label>
   );
 }

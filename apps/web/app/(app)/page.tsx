@@ -20,7 +20,7 @@ export default function HomePage() {
   const access = useQuery(api.users.accessState, {});
   const me = useQuery(api.users.me, {});
 
-  const unit = me?.units ?? "kg";
+  const unit = me?.units ?? "lb";
   const streak = workouts ? computeStreak(workouts.map((w) => w.date)) : 0;
   const last = workouts?.[0];
   const trialDaysLeft =
@@ -79,22 +79,20 @@ export default function HomePage() {
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {last.exercises.length} exercises ·{" "}
-              {last.exercises.reduce((n, e) => n + e.sets, 0)} sets
+              {last.exercises.reduce((n, e) => n + e.sets.length, 0)} sets
             </p>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {last.exercises.slice(0, 4).map((e, i) => (
+              {last.exercises.map((e, i) => (
                 <span
                   key={i}
                   className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground"
                 >
                   {e.name}
+                  <span className="ml-1 text-muted-foreground/70">
+                    ×{e.sets.length}
+                  </span>
                 </span>
               ))}
-              {last.exercises.length > 4 && (
-                <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-                  +{last.exercises.length - 4}
-                </span>
-              )}
             </div>
           </Link>
         ) : (
@@ -117,17 +115,20 @@ export default function HomePage() {
             {workouts.slice(1, 10).map((w) => (
               <li
                 key={w._id}
-                className="flex items-center justify-between rounded-xl border border-border px-4 py-3"
+                className="rounded-xl border border-border px-4 py-3"
               >
-                <div>
+                <div className="flex items-center justify-between">
                   <p className="font-medium">{w.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {w.exercises.length} exercises ·{" "}
-                    {w.exercises.reduce((n, e) => n + e.sets, 0)} sets
+                    {formatDate(w.date)}
                   </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {formatDate(w.date)}
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  {w.exercises.map((e) => e.name).join(", ")}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground/70">
+                  {w.exercises.length} exercises ·{" "}
+                  {w.exercises.reduce((n, e) => n + e.sets.length, 0)} sets
                 </p>
               </li>
             ))}

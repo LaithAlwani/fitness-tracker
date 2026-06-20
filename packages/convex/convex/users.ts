@@ -40,7 +40,7 @@ export const getOrCreateCurrentUser = mutation({
       email: identity.email ?? "",
       firstName: identity.givenName ?? undefined,
       lastName: identity.familyName ?? undefined,
-      units: "kg",
+      units: "lb", // default; toggle to kg in settings later
       subscriptionStatus: "trialing",
       trialEndsAt: now + TRIAL_MS,
       createdAt: now,

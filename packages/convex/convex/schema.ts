@@ -44,12 +44,16 @@ export default defineSchema({
     userId: v.id("users"),
     name: v.string(),
     date: v.number(), // epoch ms — when the workout happened
+    // Each exercise holds an ordered list of sets; weight can differ per set.
     exercises: v.array(
       v.object({
         name: v.string(),
-        sets: v.number(),
-        reps: v.number(),
-        weight: v.number(),
+        sets: v.array(
+          v.object({
+            reps: v.number(),
+            weight: v.number(),
+          }),
+        ),
       }),
     ),
   }).index("by_user_date", ["userId", "date"]),

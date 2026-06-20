@@ -39,7 +39,7 @@ const tooltipStyle = {
 export default function ProgressPage() {
   const me = useQuery(api.users.me, {});
   const workouts = useQuery(api.workouts.listForUser, { limit: 300 });
-  const unit = me?.units ?? "kg";
+  const unit = me?.units ?? "lb";
 
   const WEEKS = 8;
   let weeks: { label: string; count: number; volume: number }[] = [];
@@ -54,7 +54,8 @@ export default function ProgressPage() {
       if (!b) continue;
       b.count += 1;
       b.volume += w.exercises.reduce(
-        (s, e) => s + e.sets * e.reps * e.weight,
+        (s, e) =>
+          s + e.sets.reduce((ss, set) => ss + set.reps * set.weight, 0),
         0,
       );
     }

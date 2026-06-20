@@ -32,7 +32,7 @@ export default function BodyPage() {
   const me = useQuery(api.users.me, {});
   const entries = useQuery(api.bodyEntries.listForUser, { limit: 365 });
   const create = useMutation(api.bodyEntries.create);
-  const unit = me?.units ?? "kg";
+  const unit = me?.units ?? "lb";
 
   const [open, setOpen] = useState(false);
   const [weight, setWeight] = useState("");
@@ -127,7 +127,7 @@ export default function BodyPage() {
             <CaretDown
               className={`size-4 transition-transform ${showMeas ? "rotate-180" : ""}`}
             />
-            Measurements (optional)
+            Measurements — inches (optional)
           </button>
           {showMeas && (
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
