@@ -1,7 +1,12 @@
 import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
-import { getCurrentUser, getCurrentUserOrThrow, requireAccess } from "./model";
+import {
+  getCurrentUser,
+  getCurrentUserOrThrow,
+  getOrCreateUser,
+  requireAccess,
+} from "./model";
 
 const measurements = v.object({
   waist: v.optional(v.number()),
@@ -19,7 +24,7 @@ export const create = mutation({
     measurements: v.optional(measurements),
   },
   handler: async (ctx, { weight, date, notes, measurements: m }) => {
-    const user = await getCurrentUserOrThrow(ctx);
+    const user = await getOrCreateUser(ctx);
     requireAccess(user, Date.now());
     if (!(weight > 0)) throw new Error("Enter a valid weight");
 

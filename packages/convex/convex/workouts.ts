@@ -1,7 +1,12 @@
 import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
-import { getCurrentUser, getCurrentUserOrThrow, requireAccess } from "./model";
+import {
+  getCurrentUser,
+  getCurrentUserOrThrow,
+  getOrCreateUser,
+  requireAccess,
+} from "./model";
 
 const setEntry = v.object({
   reps: v.number(),
@@ -37,7 +42,7 @@ export const create = mutation({
     exercises: v.array(exerciseEntry),
   },
   handler: async (ctx, { name, date, exercises }) => {
-    const user = await getCurrentUserOrThrow(ctx);
+    const user = await getOrCreateUser(ctx);
     requireAccess(user, Date.now());
 
     const cleaned = cleanExercises(exercises);
