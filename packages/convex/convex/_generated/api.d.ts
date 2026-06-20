@@ -8,9 +8,11 @@
  * @module
  */
 
+import type * as billing from "../billing.js";
 import type * as bodyEntries from "../bodyEntries.js";
 import type * as crons from "../crons.js";
 import type * as exercises from "../exercises.js";
+import type * as http from "../http.js";
 import type * as model from "../model.js";
 import type * as notifications from "../notifications.js";
 import type * as users from "../users.js";
@@ -23,9 +25,11 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  billing: typeof billing;
   bodyEntries: typeof bodyEntries;
   crons: typeof crons;
   exercises: typeof exercises;
+  http: typeof http;
   model: typeof model;
   notifications: typeof notifications;
   users: typeof users;

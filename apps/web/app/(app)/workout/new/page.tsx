@@ -570,10 +570,10 @@ function LogWorkout() {
         )}
       </section>
 
-      {/* Rest timer bar */}
+      {/* Rest timer bar — pinned bottom, solid */}
       {restRemaining !== null && (
         <div className="fixed inset-x-0 bottom-16 z-40 px-4 sm:bottom-4">
-          <div className="mx-auto flex max-w-md items-center justify-between gap-3 rounded-full border border-border bg-card/95 px-4 py-2.5 shadow-xl backdrop-blur">
+          <div className="mx-auto flex max-w-md items-center justify-between gap-3 rounded-full border border-border bg-card px-4 py-2.5 shadow-xl">
             <div className="flex items-center gap-2">
               <Timer weight="bold" className="size-5 text-accent-strong" />
               <span className="font-mono text-lg tabular-nums">

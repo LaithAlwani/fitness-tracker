@@ -32,7 +32,9 @@ export default defineSchema({
     currentPeriodEnd: v.optional(v.number()),
 
     createdAt: v.number(),
-  }).index("by_clerk_id", ["clerkId"]),
+  })
+    .index("by_clerk_id", ["clerkId"])
+    .index("by_stripe_customer", ["stripeCustomerId"]),
 
   exercises: defineTable({
     name: v.string(),

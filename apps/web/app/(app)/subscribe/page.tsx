@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { useState } from "react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import { Check } from "@phosphor-icons/react";
 import { buttonClass } from "@/components/ui/button";
@@ -15,12 +16,43 @@ const FEATURES = [
 
 export default function SubscribePage() {
   const access = useQuery(api.users.accessState, {});
-  const status = access?.status;
+  const me = useQuery(api.users.me, {});
+  const checkout = useAction(api.billing.createCheckoutSession);
+  const portal = useAction(api.billing.createPortalSession);
 
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const status = access?.status;
+  const hasSubscription = !!me?.stripeSubscriptionId;
   const trialDaysLeft =
     status === "trialing" && access?.trialEndsAt
       ? Math.max(0, Math.ceil((access.trialEndsAt - Date.now()) / 86_400_000))
       : null;
+
+  const heading =
+    status === "trialing"
+      ? `You're on the free trial — ${trialDaysLeft} ${trialDaysLeft === 1 ? "day" : "days"} left.`
+      : status === "active"
+        ? "Your membership is active. Thanks for lifting with us."
+        : status === "past_due"
+          ? "There was a problem with your last payment."
+          : "Start your 30-day free trial to unlock Liftify.";
+
+  async function go(kind: "checkout" | "portal") {
+    setBusy(true);
+    setError(null);
+    try {
+      const { url } =
+        kind === "checkout"
+          ? await checkout({ appUrl: window.location.origin })
+          : await portal({ appUrl: window.location.origin });
+      window.location.href = url;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="container-page flex flex-col items-center gap-6 py-12">
@@ -28,13 +60,7 @@ export default function SubscribePage() {
         <h1 className="text-3xl font-semibold tracking-tighter">
           Liftify Membership
         </h1>
-        <p className="mt-2 text-muted-foreground">
-          {status === "trialing"
-            ? `You're on the free trial — ${trialDaysLeft} ${trialDaysLeft === 1 ? "day" : "days"} left.`
-            : status === "active"
-              ? "Your membership is active. Thanks for lifting with us."
-              : "Start your 30-day free trial to unlock Liftify."}
-        </p>
+        <p className="mt-2 text-muted-foreground">{heading}</p>
       </div>
 
       <div className="w-full max-w-md rounded-card border-2 border-accent-strong bg-card p-8 shadow-xl shadow-accent/10">
@@ -45,6 +71,7 @@ export default function SubscribePage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Free for your first 30 days.
         </p>
+
         <ul className="mt-6 flex flex-col gap-3 text-sm">
           {FEATURES.map((f) => (
             <li key={f} className="flex items-start gap-2.5">
@@ -57,21 +84,39 @@ export default function SubscribePage() {
           ))}
         </ul>
 
-        <button
-          disabled
-          className={buttonClass("primary", "lg", "mt-8 w-full")}
-          title="Stripe checkout is wired up once billing keys are added"
-        >
-          Subscribe — coming soon
-        </button>
+        {hasSubscription ? (
+          <button
+            onClick={() => go("portal")}
+            disabled={busy}
+            className={buttonClass("primary", "lg", "mt-8 w-full")}
+          >
+            {busy ? "Opening…" : "Manage membership"}
+          </button>
+        ) : (
+          <button
+            onClick={() => go("checkout")}
+            disabled={busy}
+            className={buttonClass("primary", "lg", "mt-8 w-full")}
+          >
+            {busy
+              ? "Starting…"
+              : status === "trialing"
+                ? "Subscribe now"
+                : "Start membership"}
+          </button>
+        )}
+
+        {error && <p className="mt-3 text-center text-sm text-red-600">{error}</p>}
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          Checkout activates once Stripe billing is connected. Your trial keeps
-          working in the meantime.
+          Cancel anytime. Secure checkout by Stripe.
         </p>
       </div>
 
       {access?.hasAccess && (
-        <Link href="/" className="text-sm font-medium text-muted-foreground underline">
+        <Link
+          href="/"
+          className="text-sm font-medium text-muted-foreground underline"
+        >
           Back to the app
         </Link>
       )}

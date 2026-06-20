@@ -22,7 +22,8 @@
   },
   "dependencies": {
     "@liftify/shared": "*",
-    "convex": "^1.17.4"
+    "convex": "^1.17.4",
+    "stripe": "^17.5.0"
   },
   "devDependencies": {
     "@liftify/tsconfig": "*",
