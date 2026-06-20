@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import { Flame, Plus, ClockCounterClockwise } from "@phosphor-icons/react";
@@ -19,6 +20,15 @@ export default function HomePage() {
   const workouts = useQuery(api.workouts.listForUser, { limit: 60 });
   const access = useQuery(api.users.accessState, {});
   const me = useQuery(api.users.me, {});
+
+  const [hasDraft, setHasDraft] = useState(false);
+  useEffect(() => {
+    try {
+      setHasDraft(!!localStorage.getItem("liftify:draft-workout"));
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const unit = me?.units ?? "lb";
   const streak = workouts ? computeStreak(workouts.map((w) => w.date)) : 0;
@@ -56,7 +66,7 @@ export default function HomePage() {
 
       <Link href="/workout/new" className={buttonClass("primary", "lg", "w-full")}>
         <Plus weight="bold" className="size-5" />
-        Start workout
+        {hasDraft ? "Resume workout" : "Start workout"}
       </Link>
 
       {/* Last workout */}

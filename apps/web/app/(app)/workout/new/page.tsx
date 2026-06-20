@@ -1,24 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
-import {
-  MagnifyingGlass,
-  Plus,
-  Trash,
-  X,
-  Check,
-  FloppyDisk,
-} from "@phosphor-icons/react";
+import { MagnifyingGlass, Plus, Trash, X, Check } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 
 type SetRow = { id: string; reps: string; weight: string };
 type Entry = { id: string; name: string; sets: SetRow[] };
 
+const DRAFT_KEY = "liftify:draft-workout";
+
 let counter = 0;
-const uid = () => `r${counter++}`;
+const uid = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `r${counter++}`;
 const toNum = (s: string) => (s.trim() === "" ? 0 : Number(s));
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -40,8 +38,34 @@ export default function LogWorkoutPage() {
   const [scrollTarget, setScrollTarget] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const unit = me?.units ?? "lb";
+
+  // Persist the in-progress workout so leaving and returning keeps everything.
+  const loaded = useRef(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw) as { name?: string; entries?: Entry[] };
+        if (draft.name) setName(draft.name);
+        if (Array.isArray(draft.entries)) setEntries(draft.entries);
+      }
+    } catch {
+      /* ignore corrupt draft */
+    }
+    loaded.current = true;
+  }, []);
+  useEffect(() => {
+    if (!loaded.current) return;
+    try {
+      if (entries.length === 0) localStorage.removeItem(DRAFT_KEY);
+      else localStorage.setItem(DRAFT_KEY, JSON.stringify({ name, entries }));
+    } catch {
+      /* storage full / unavailable */
+    }
+  }, [name, entries]);
 
   const groups = useMemo(() => {
     if (!allExercises) return [];
@@ -144,13 +168,18 @@ export default function LogWorkoutPage() {
     );
   }
 
-  async function save() {
+  function requestFinish() {
     setError(null);
     if (entries.length === 0) {
       setError("Add at least one exercise.");
       return;
     }
+    setConfirmOpen(true);
+  }
+
+  async function save() {
     setSaving(true);
+    setError(null);
     try {
       await create({
         name,
@@ -162,6 +191,11 @@ export default function LogWorkoutPage() {
           })),
         })),
       });
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        /* ignore */
+      }
       router.push("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save workout.");
@@ -184,9 +218,9 @@ export default function LogWorkoutPage() {
           aria-label="Workout name"
           className={`h-11 flex-1 text-lg font-semibold tracking-tight ${inputBase}`}
         />
-        <Button onClick={save} disabled={saving || entries.length === 0}>
-          <FloppyDisk weight="bold" className="size-4" />
-          {saving ? "Saving…" : "Save"}
+        <Button onClick={requestFinish} disabled={saving || entries.length === 0}>
+          <Check weight="bold" className="size-4" />
+          Finish
         </Button>
       </div>
 
@@ -375,6 +409,41 @@ export default function LogWorkoutPage() {
           </ul>
         )}
       </section>
+
+      {confirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+          onClick={() => !saving && setConfirmOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-sm rounded-card border border-border bg-card p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold tracking-tight">
+              Finish workout?
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              Save &ldquo;{name.trim() || "Workout"}&rdquo; with {entries.length}{" "}
+              exercise{entries.length === 1 ? "" : "s"} to your history?
+            </p>
+            {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+            <div className="mt-6 flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmOpen(false)}
+                disabled={saving}
+              >
+                Keep going
+              </Button>
+              <Button onClick={save} disabled={saving}>
+                {saving ? "Saving…" : "Finish workout"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
