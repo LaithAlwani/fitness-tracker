@@ -7,6 +7,16 @@ export function RegisterSW() {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
       return;
     }
+
+    // In dev, make sure no stale service worker is intercepting requests.
+    if (process.env.NODE_ENV !== "production") {
+      navigator.serviceWorker
+        .getRegistrations?.()
+        .then((regs) => regs.forEach((r) => r.unregister()))
+        .catch(() => {});
+      return;
+    }
+
     const { protocol, hostname } = window.location;
     const secureContext =
       protocol === "https:" ||
