@@ -52,19 +52,18 @@ export default function LogWorkoutPage() {
     ].sort();
   }, [allExercises]);
 
-  // Most-recent average weight per exercise, to show a +/- delta as you log.
-  const lastAvgByExercise = useMemo(() => {
+  // All-time heaviest weight per exercise, to show a +/- delta vs your best.
+  const bestByExercise = useMemo(() => {
     const map = new Map<string, number>();
     if (!history) return map;
     for (const w of history) {
-      // history is newest-first, so the first time we see an exercise wins.
       for (const ex of w.exercises) {
-        const key = ex.name.toLowerCase();
-        if (map.has(key)) continue;
         const weights = ex.sets.map((s) => s.weight).filter((x) => x > 0);
-        if (weights.length) {
-          map.set(key, weights.reduce((a, b) => a + b, 0) / weights.length);
-        }
+        if (!weights.length) continue;
+        const key = ex.name.toLowerCase();
+        const localMax = Math.max(...weights);
+        const prev = map.get(key);
+        if (prev === undefined || localMax > prev) map.set(key, localMax);
       }
     }
     return map;
@@ -192,7 +191,7 @@ export default function LogWorkoutPage() {
       {entries.length > 0 && (
         <section className="flex flex-col gap-3">
           {entries.map((entry) => {
-            const avg = lastAvgByExercise.get(entry.name.toLowerCase());
+            const best = bestByExercise.get(entry.name.toLowerCase());
             return (
               <div
                 key={entry.id}
@@ -202,9 +201,9 @@ export default function LogWorkoutPage() {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex flex-wrap items-baseline gap-x-2">
                     <p className="font-medium">{entry.name}</p>
-                    {avg !== undefined && (
+                    {best !== undefined && (
                       <span className="text-xs text-muted-foreground">
-                        last avg {round1(avg)} {unit}
+                        best {round1(best)} {unit}
                       </span>
                     )}
                   </div>
@@ -223,13 +222,13 @@ export default function LogWorkoutPage() {
                     <span className="w-8">Set</span>
                     <span className="flex-1">Reps</span>
                     <span className="flex-1">Weight ({unit})</span>
-                    <span className="w-14 text-center">vs last</span>
+                    <span className="w-14 text-center">vs best</span>
                     <span className="w-7" />
                   </div>
                   {entry.sets.map((s, i) => {
                     const delta =
-                      avg !== undefined && s.weight.trim() !== ""
-                        ? toNum(s.weight) - avg
+                      best !== undefined && s.weight.trim() !== ""
+                        ? toNum(s.weight) - best
                         : null;
                     return (
                       <div key={s.id} className="flex items-center gap-2">
