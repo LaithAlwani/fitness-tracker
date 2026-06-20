@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
@@ -28,27 +28,60 @@ const inputBase =
 export default function LogWorkoutPage() {
   const router = useRouter();
   const me = useQuery(api.users.me, {});
-  const [search, setSearch] = useState("");
-  const exercises = useQuery(api.exercises.list, { search });
+  const allExercises = useQuery(api.exercises.list, {});
   const create = useMutation(api.workouts.create);
 
   const [name, setName] = useState("Workout");
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [search, setSearch] = useState("");
+  const [group, setGroup] = useState<string | null>(null);
+  const [scrollTarget, setScrollTarget] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const unit = me?.units ?? "lb";
 
+  const groups = useMemo(() => {
+    if (!allExercises) return [];
+    return [
+      ...new Set(
+        allExercises.map((e) => e.muscleGroup).filter((g): g is string => !!g),
+      ),
+    ].sort();
+  }, [allExercises]);
+
+  const term = search.trim().toLowerCase();
+  const visible = (allExercises ?? []).filter(
+    (e) =>
+      (!group || e.muscleGroup === group) &&
+      (!term || e.name.toLowerCase().includes(term)),
+  );
+
+  // Scroll to (and focus) the exercise that was just added.
+  useEffect(() => {
+    if (!scrollTarget) return;
+    const el = document.getElementById(`ex-${scrollTarget}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.querySelector("input")?.focus({ preventScroll: true });
+    }
+    setScrollTarget(null);
+  }, [scrollTarget]);
+
   function addExercise(exName: string) {
-    setEntries((prev) => {
-      if (prev.some((e) => e.name.toLowerCase() === exName.toLowerCase())) {
-        return prev;
-      }
-      return [
-        ...prev,
-        { id: uid(), name: exName, sets: [{ id: uid(), reps: "", weight: "" }] },
-      ];
-    });
+    const existing = entries.find(
+      (e) => e.name.toLowerCase() === exName.toLowerCase(),
+    );
+    if (existing) {
+      setScrollTarget(existing.id);
+      return;
+    }
+    const id = uid();
+    setEntries((prev) => [
+      ...prev,
+      { id, name: exName, sets: [{ id: uid(), reps: "", weight: "" }] },
+    ]);
+    setScrollTarget(id);
   }
   function removeExercise(id: string) {
     setEntries((prev) => prev.filter((e) => e.id !== id));
@@ -58,7 +91,6 @@ export default function LogWorkoutPage() {
       prev.map((e) => {
         if (e.id !== entryId) return e;
         const last = e.sets[e.sets.length - 1];
-        // Pre-fill with the previous set's numbers; user tweaks what changed.
         const next: SetRow = {
           id: uid(),
           reps: last?.reps ?? "",
@@ -85,7 +117,6 @@ export default function LogWorkoutPage() {
       prev.flatMap((e) => {
         if (e.id !== entryId) return [e];
         const sets = e.sets.filter((s) => s.id !== setId);
-        // Removing the last set removes the exercise.
         return sets.length === 0 ? [] : [{ ...e, sets }];
       }),
     );
@@ -119,8 +150,8 @@ export default function LogWorkoutPage() {
   const customName = search.trim();
   const showAddCustom =
     customName.length > 0 &&
-    exercises !== undefined &&
-    !exercises.some((e) => e.name.toLowerCase() === customName.toLowerCase());
+    allExercises !== undefined &&
+    !allExercises.some((e) => e.name.toLowerCase() === customName.toLowerCase());
 
   return (
     <div className="container-page flex flex-col gap-6 py-8">
@@ -143,7 +174,8 @@ export default function LogWorkoutPage() {
           {entries.map((entry) => (
             <div
               key={entry.id}
-              className="rounded-card border border-border bg-card p-4"
+              id={`ex-${entry.id}`}
+              className="scroll-mt-20 rounded-card border border-border bg-card p-4"
             >
               <div className="flex items-center justify-between">
                 <p className="font-medium">{entry.name}</p>
@@ -230,6 +262,22 @@ export default function LogWorkoutPage() {
           />
         </div>
 
+        {/* Filter pills — scroll horizontally on mobile */}
+        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+          <FilterPill active={group === null} onClick={() => setGroup(null)}>
+            All
+          </FilterPill>
+          {groups.map((g) => (
+            <FilterPill
+              key={g}
+              active={group === g}
+              onClick={() => setGroup(group === g ? null : g)}
+            >
+              {g}
+            </FilterPill>
+          ))}
+        </div>
+
         {showAddCustom && (
           <button
             onClick={() => {
@@ -243,7 +291,7 @@ export default function LogWorkoutPage() {
           </button>
         )}
 
-        {exercises === undefined ? (
+        {allExercises === undefined ? (
           <ul className="flex flex-col gap-1.5">
             {Array.from({ length: 6 }).map((_, i) => (
               <li
@@ -254,7 +302,7 @@ export default function LogWorkoutPage() {
           </ul>
         ) : (
           <ul className="flex flex-col gap-1.5">
-            {exercises.map((ex) => {
+            {visible.map((ex) => {
               const added = entries.some((e) => e.name === ex.name);
               return (
                 <li key={ex._id}>
@@ -265,7 +313,7 @@ export default function LogWorkoutPage() {
                     <span className="flex items-baseline gap-2">
                       <span className="font-medium">{ex.name}</span>
                       {ex.muscleGroup && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs capitalize text-muted-foreground">
                           {ex.muscleGroup}
                         </span>
                       )}
@@ -279,7 +327,7 @@ export default function LogWorkoutPage() {
                 </li>
               );
             })}
-            {exercises.length === 0 && (
+            {visible.length === 0 && (
               <p className="px-1 text-sm text-muted-foreground">
                 No matches — type a name and add it as custom.
               </p>
@@ -288,5 +336,28 @@ export default function LogWorkoutPage() {
         )}
       </section>
     </div>
+  );
+}
+
+function FilterPill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium capitalize transition-colors ${
+        active
+          ? "border-accent bg-accent text-accent-foreground"
+          : "border-border text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
   );
 }

@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   href={item.href}
                   className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                     active
-                      ? "bg-muted text-foreground"
+                      ? "bg-accent text-accent-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -99,10 +99,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-xs ${
-                  active ? "text-foreground" : "text-muted-foreground"
+                  active ? "text-accent-strong" : "text-muted-foreground"
                 }`}
               >
-                <Ico weight={active ? "fill" : "regular"} className="size-6" />
+                <Ico weight="regular" className="size-6" />
                 {item.label}
               </Link>
             );

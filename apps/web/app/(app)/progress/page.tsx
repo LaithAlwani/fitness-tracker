@@ -12,6 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { Info } from "@phosphor-icons/react";
 
 const DAY = 86_400_000;
 
@@ -106,7 +107,10 @@ export default function ProgressPage() {
             </BarChart>
           </ChartCard>
 
-          <ChartCard title={`Weekly volume (sets × reps × ${unit})`}>
+          <ChartCard
+            title="Weekly volume"
+            hint={`Training volume = the total weight you moved each week. For every set we multiply reps × weight, then add it all up (in ${unit}). It's a simple proxy for how hard you trained — higher usually means more total work.`}
+          >
             <LineChart data={weeks} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
               <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={false} />
               <YAxis
@@ -144,19 +148,44 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function ChartCard({
   title,
+  hint,
   children,
 }: {
   title: string;
+  hint?: string;
   children: React.ReactElement;
 }) {
   return (
     <section className="rounded-card border border-border bg-card p-5">
-      <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
+      <div className="flex items-center gap-1.5">
+        <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
+        {hint && <InfoHint text={hint} />}
+      </div>
       <div className="mt-4 h-56">
         <ResponsiveContainer width="100%" height="100%">
           {children}
         </ResponsiveContainer>
       </div>
     </section>
+  );
+}
+
+function InfoHint({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex">
+      <button
+        type="button"
+        aria-label="What does this mean?"
+        className="flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Info className="size-4" />
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute right-0 top-full z-20 mt-2 w-64 rounded-xl border border-border bg-card p-3 text-xs leading-relaxed text-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+      >
+        {text}
+      </span>
+    </span>
   );
 }
