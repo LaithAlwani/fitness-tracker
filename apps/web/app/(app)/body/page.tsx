@@ -294,19 +294,32 @@ export default function BodyPage() {
                   {editError && (
                     <p className="mt-2 text-sm text-red-600">{editError}</p>
                   )}
-                  <div className="mt-3 flex justify-end gap-2">
+                  <div className="mt-3 flex items-center justify-between gap-2">
                     <Button
-                      variant="secondary"
+                      variant="danger"
                       size="sm"
-                      onClick={() => setEditingId(null)}
+                      onClick={() => {
+                        removeEntry({ entryId: e._id });
+                        setEditingId(null);
+                      }}
                     >
-                      <X className="size-4" />
-                      Cancel
+                      <Trash className="size-4" />
+                      Delete
                     </Button>
-                    <Button size="sm" onClick={() => saveEdit(e._id)}>
-                      <Check weight="bold" className="size-4" />
-                      Save
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setEditingId(null)}
+                      >
+                        <X className="size-4" />
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={() => saveEdit(e._id)}>
+                        <Check weight="bold" className="size-4" />
+                        Save
+                      </Button>
+                    </div>
                   </div>
                 </li>
               ) : (
@@ -324,8 +337,8 @@ export default function BodyPage() {
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className="mr-1 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground/70">
                       {shortDate(e.date)}
                     </span>
                     <button
@@ -334,13 +347,6 @@ export default function BodyPage() {
                       className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                       <PencilSimple className="size-4" />
-                    </button>
-                    <button
-                      onClick={() => removeEntry({ entryId: e._id })}
-                      aria-label="Delete entry"
-                      className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
-                    >
-                      <Trash className="size-4" />
                     </button>
                   </div>
                 </li>
