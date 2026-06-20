@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import {
   House,
   Barbell,
   Scales,
   ChartLineUp,
+  ClockCounterClockwise,
   type Icon,
 } from "@phosphor-icons/react";
 import { NotificationBell } from "@/components/notification-bell";
@@ -18,6 +19,7 @@ import { NotificationBell } from "@/components/notification-bell";
 const NAV: { href: string; label: string; icon: Icon }[] = [
   { href: "/", label: "Home", icon: House },
   { href: "/workout/new", label: "Log", icon: Barbell },
+  { href: "/history", label: "History", icon: ClockCounterClockwise },
   { href: "/body", label: "Body", icon: Scales },
   { href: "/progress", label: "Progress", icon: ChartLineUp },
 ];
@@ -30,6 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useUser();
+  const { isAuthenticated } = useConvexAuth();
   const ensureUser = useMutation(api.users.getOrCreateCurrentUser);
   const ensureWeekly = useMutation(api.notifications.ensureWeekly);
   const access = useQuery(api.users.accessState);
@@ -40,13 +43,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     "U"
   ).toUpperCase();
 
-  // Create the user row (and start the trial) on first authenticated load,
-  // then make sure this week's reminder exists.
+  // Create the user row (and start the trial) once Convex has the Clerk token,
+  // then make sure this week's reminder exists. Gating on isAuthenticated
+  // avoids a "Not authenticated" call during the token handshake.
   useEffect(() => {
+    if (!isAuthenticated) return;
     ensureUser()
       .then(() => ensureWeekly())
       .catch(() => {});
-  }, [ensureUser, ensureWeekly]);
+  }, [isAuthenticated, ensureUser, ensureWeekly]);
 
   // Gate: send lapsed users to the paywall.
   useEffect(() => {

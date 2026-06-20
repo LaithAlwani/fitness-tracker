@@ -4,12 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@liftify/convex";
-import {
-  Flame,
-  Plus,
-  ClockCounterClockwise,
-  PencilSimple,
-} from "@phosphor-icons/react";
+import { Flame, Plus, ClockCounterClockwise } from "@phosphor-icons/react";
 import { buttonClass } from "@/components/ui/button";
 import { computeStreak } from "@/lib/streak";
 
@@ -82,21 +77,15 @@ export default function HomePage() {
         {workouts === undefined ? (
           <div className="h-24 animate-pulse rounded-card border border-border bg-muted" />
         ) : last ? (
-          <div className="rounded-card border border-border bg-card p-5">
+          <Link
+            href={`/workout/${last._id}`}
+            className="block rounded-card border border-border bg-card p-5 transition-colors hover:border-accent-strong/40"
+          >
             <div className="flex items-center justify-between gap-2">
               <p className="font-semibold tracking-tight">{last.name}</p>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {formatDate(last.date)}
-                </span>
-                <Link
-                  href={`/workout/new?edit=${last._id}`}
-                  className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium text-accent-strong transition-colors hover:bg-accent/10"
-                >
-                  <PencilSimple className="size-4" />
-                  Edit
-                </Link>
-              </div>
+              <span className="text-sm text-muted-foreground">
+                {formatDate(last.date)}
+              </span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {last.exercises.length} exercises ·{" "}
@@ -115,7 +104,7 @@ export default function HomePage() {
                 </span>
               ))}
             </div>
-          </div>
+          </Link>
         ) : (
           <div className="rounded-card border border-dashed border-border p-6 text-center text-muted-foreground">
             No workouts yet. Tap{" "}
@@ -128,29 +117,35 @@ export default function HomePage() {
       {/* Recent */}
       {workouts && workouts.length > 1 && (
         <section className="flex flex-col gap-3">
-          <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <ClockCounterClockwise className="size-4" />
-            Recent
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <ClockCounterClockwise className="size-4" />
+              Recent
+            </h2>
+            <Link
+              href="/history"
+              className="text-sm font-medium text-accent-strong hover:underline"
+            >
+              See all
+            </Link>
+          </div>
           <ul className="flex flex-col gap-2">
-            {workouts.slice(1, 10).map((w) => (
-              <li
-                key={w._id}
-                className="rounded-xl border border-border px-4 py-3"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="font-medium">{w.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDate(w.date)}
+            {workouts.slice(1, 6).map((w) => (
+              <li key={w._id}>
+                <Link
+                  href={`/workout/${w._id}`}
+                  className="block rounded-xl border border-border px-4 py-3 transition-colors hover:border-accent-strong/40"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">{w.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDate(w.date)}
+                    </p>
+                  </div>
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                    {w.exercises.map((e) => e.name).join(", ")}
                   </p>
-                </div>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {w.exercises.map((e) => e.name).join(", ")}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground/70">
-                  {w.exercises.length} exercises ·{" "}
-                  {w.exercises.reduce((n, e) => n + e.sets.length, 0)} sets
-                </p>
+                </Link>
               </li>
             ))}
           </ul>
