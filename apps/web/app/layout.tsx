@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "./providers";
+import { RegisterSW } from "@/components/register-sw";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,6 +19,10 @@ export const metadata: Metadata = {
   title: "Liftify — Track workouts fast",
   description: "Log workouts in seconds and watch your progress over time.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -49,6 +54,7 @@ export default function RootLayout({
       >
         <body className="min-h-full flex flex-col">
           <Providers>{children}</Providers>
+          <RegisterSW />
         </body>
       </html>
     </ClerkProvider>
