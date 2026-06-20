@@ -11,6 +11,7 @@ import {
   Barbell,
   Scales,
   ChartLineUp,
+  Gear,
   type Icon,
 } from "@phosphor-icons/react";
 import { NotificationBell } from "@/components/notification-bell";
@@ -89,6 +90,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="flex items-center gap-1">
             <NotificationBell />
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              className={`flex size-9 items-center justify-center rounded-full transition-colors hover:bg-muted ${
+                pathname.startsWith("/settings")
+                  ? "text-accent-strong"
+                  : "text-foreground"
+              }`}
+            >
+              <Gear className="size-5" />
+            </Link>
             <UserButton />
           </div>
         </div>
