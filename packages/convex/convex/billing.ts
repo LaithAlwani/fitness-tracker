@@ -105,6 +105,55 @@ export const setCancelAtPeriodEnd = internalMutation({
   },
 });
 
+// In-app card update: start a SetupIntent the client confirms with Stripe
+// Elements; then setDefaultPaymentMethod points future charges at the new card.
+export const createSetupIntent = action({
+  args: {},
+  handler: async (ctx): Promise<{ clientSecret: string }> => {
+    const user = await ctx.runQuery(api.users.me, {});
+    if (!user) throw new Error("User not found");
+
+    const stripe = getStripe();
+    let customerId = user.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email || undefined,
+        metadata: { clerkId: user.clerkId },
+      });
+      customerId = customer.id;
+      await ctx.runMutation(internal.billing.setStripeCustomer, {
+        userId: user._id,
+        stripeCustomerId: customerId,
+      });
+    }
+
+    const si = await stripe.setupIntents.create({
+      customer: customerId,
+      payment_method_types: ["card"],
+      usage: "off_session",
+    });
+    if (!si.client_secret) throw new Error("Could not start card setup");
+    return { clientSecret: si.client_secret };
+  },
+});
+
+export const setDefaultPaymentMethod = action({
+  args: { paymentMethodId: v.string() },
+  handler: async (ctx, { paymentMethodId }): Promise<void> => {
+    const user = await ctx.runQuery(api.users.me, {});
+    if (!user?.stripeCustomerId) throw new Error("No customer");
+    const stripe = getStripe();
+    await stripe.customers.update(user.stripeCustomerId, {
+      invoice_settings: { default_payment_method: paymentMethodId },
+    });
+    if (user.stripeSubscriptionId) {
+      await stripe.subscriptions.update(user.stripeSubscriptionId, {
+        default_payment_method: paymentMethodId,
+      });
+    }
+  },
+});
+
 export const setStripeCustomer = internalMutation({
   args: { userId: v.id("users"), stripeCustomerId: v.string() },
   handler: async (ctx, { userId, stripeCustomerId }) => {

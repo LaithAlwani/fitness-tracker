@@ -6,6 +6,7 @@ import { useAction, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import { Check, WarningCircle } from "@phosphor-icons/react";
 import { buttonClass } from "@/components/ui/button";
+import { CardUpdate } from "@/components/card-update";
 
 const FEATURES = [
   "Unlimited workout logging",
@@ -32,6 +33,7 @@ export default function SubscribePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [showCard, setShowCard] = useState(false);
 
   const status = access?.status;
   const hasSubscription =
@@ -155,6 +157,18 @@ export default function SubscribePage() {
               >
                 Cancel membership
               </button>
+            )}
+
+            <button
+              onClick={() => setShowCard((v) => !v)}
+              className={buttonClass("ghost", "md", "w-full")}
+            >
+              {showCard ? "Close card form" : "Update payment method"}
+            </button>
+            {showCard && (
+              <div className="rounded-xl border border-border p-4">
+                <CardUpdate onClose={() => setShowCard(false)} />
+              </div>
             )}
           </div>
         ) : (

@@ -13,6 +13,8 @@
     "@clerk/nextjs": "^6",
     "@liftify/convex": "*",
     "@phosphor-icons/react": "^2.1.10",
+    "@stripe/react-stripe-js": "^6.6.0",
+    "@stripe/stripe-js": "^9.8.0",
     "convex": "^1.17.4",
     "next": "16.2.9",
     "react": "19.2.4",
