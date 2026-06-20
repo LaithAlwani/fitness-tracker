@@ -20,6 +20,7 @@ type Entry = { id: string; name: string; sets: SetRow[] };
 let counter = 0;
 const uid = () => `r${counter++}`;
 const toNum = (s: string) => (s.trim() === "" ? 0 : Number(s));
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
 const inputBase =
   "rounded-xl border border-border bg-background px-3 text-base text-foreground " +
@@ -29,6 +30,7 @@ export default function LogWorkoutPage() {
   const router = useRouter();
   const me = useQuery(api.users.me, {});
   const allExercises = useQuery(api.exercises.list, {});
+  const history = useQuery(api.workouts.listForUser, { limit: 100 });
   const create = useMutation(api.workouts.create);
 
   const [name, setName] = useState("Workout");
@@ -49,6 +51,24 @@ export default function LogWorkoutPage() {
       ),
     ].sort();
   }, [allExercises]);
+
+  // Most-recent average weight per exercise, to show a +/- delta as you log.
+  const lastAvgByExercise = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!history) return map;
+    for (const w of history) {
+      // history is newest-first, so the first time we see an exercise wins.
+      for (const ex of w.exercises) {
+        const key = ex.name.toLowerCase();
+        if (map.has(key)) continue;
+        const weights = ex.sets.map((s) => s.weight).filter((x) => x > 0);
+        if (weights.length) {
+          map.set(key, weights.reduce((a, b) => a + b, 0) / weights.length);
+        }
+      }
+    }
+    return map;
+  }, [history]);
 
   const term = search.trim().toLowerCase();
   const visible = (allExercises ?? []).filter(
@@ -171,80 +191,98 @@ export default function LogWorkoutPage() {
       {/* Current workout */}
       {entries.length > 0 && (
         <section className="flex flex-col gap-3">
-          {entries.map((entry) => (
-            <div
-              key={entry.id}
-              id={`ex-${entry.id}`}
-              className="scroll-mt-20 rounded-card border border-border bg-card p-4"
-            >
-              <div className="flex items-center justify-between">
-                <p className="font-medium">{entry.name}</p>
-                <button
-                  onClick={() => removeExercise(entry.id)}
-                  aria-label={`Remove ${entry.name}`}
-                  className="text-muted-foreground transition-colors hover:text-red-600"
-                >
-                  <Trash className="size-4" />
-                </button>
-              </div>
-
-              {/* Sets */}
-              <div className="mt-3 flex flex-col gap-2">
-                <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
-                  <span className="w-10">Set</span>
-                  <span className="flex-1">Reps</span>
-                  <span className="flex-1">Weight ({unit})</span>
-                  <span className="w-7" />
-                </div>
-                {entry.sets.map((s, i) => (
-                  <div key={s.id} className="flex items-center gap-2">
-                    <span className="w-10 text-sm font-medium tabular-nums text-muted-foreground">
-                      {i + 1}
-                    </span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      placeholder="0"
-                      value={s.reps}
-                      onChange={(e) =>
-                        updateSet(entry.id, s.id, { reps: e.target.value })
-                      }
-                      aria-label={`Set ${i + 1} reps`}
-                      className={`h-11 w-full flex-1 tabular-nums ${inputBase}`}
-                    />
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="0.5"
-                      min="0"
-                      placeholder="0"
-                      value={s.weight}
-                      onChange={(e) =>
-                        updateSet(entry.id, s.id, { weight: e.target.value })
-                      }
-                      aria-label={`Set ${i + 1} weight`}
-                      className={`h-11 w-full flex-1 tabular-nums ${inputBase}`}
-                    />
-                    <button
-                      onClick={() => removeSet(entry.id, s.id)}
-                      aria-label={`Remove set ${i + 1}`}
-                      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
-                    >
-                      <X className="size-4" />
-                    </button>
+          {entries.map((entry) => {
+            const avg = lastAvgByExercise.get(entry.name.toLowerCase());
+            return (
+              <div
+                key={entry.id}
+                id={`ex-${entry.id}`}
+                className="scroll-mt-20 rounded-card border border-border bg-card p-4"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <p className="font-medium">{entry.name}</p>
+                    {avg !== undefined && (
+                      <span className="text-xs text-muted-foreground">
+                        last avg {round1(avg)} {unit}
+                      </span>
+                    )}
                   </div>
-                ))}
-                <button
-                  onClick={() => addSet(entry.id)}
-                  className="mt-1 inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1.5 text-sm font-medium text-accent-strong transition-colors hover:bg-accent/10"
-                >
-                  <Plus weight="bold" className="size-4" />
-                  Add set
-                </button>
+                  <button
+                    onClick={() => removeExercise(entry.id)}
+                    aria-label={`Remove ${entry.name}`}
+                    className="text-muted-foreground transition-colors hover:text-red-600"
+                  >
+                    <Trash className="size-4" />
+                  </button>
+                </div>
+
+                {/* Sets */}
+                <div className="mt-3 flex flex-col gap-2">
+                  <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+                    <span className="w-8">Set</span>
+                    <span className="flex-1">Reps</span>
+                    <span className="flex-1">Weight ({unit})</span>
+                    <span className="w-14 text-center">vs last</span>
+                    <span className="w-7" />
+                  </div>
+                  {entry.sets.map((s, i) => {
+                    const delta =
+                      avg !== undefined && s.weight.trim() !== ""
+                        ? toNum(s.weight) - avg
+                        : null;
+                    return (
+                      <div key={s.id} className="flex items-center gap-2">
+                        <span className="w-8 text-sm font-medium tabular-nums text-muted-foreground">
+                          {i + 1}
+                        </span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min="0"
+                          placeholder="0"
+                          value={s.reps}
+                          onChange={(e) =>
+                            updateSet(entry.id, s.id, { reps: e.target.value })
+                          }
+                          aria-label={`Set ${i + 1} reps`}
+                          className={`h-11 w-full flex-1 tabular-nums ${inputBase}`}
+                        />
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.5"
+                          min="0"
+                          placeholder="0"
+                          value={s.weight}
+                          onChange={(e) =>
+                            updateSet(entry.id, s.id, { weight: e.target.value })
+                          }
+                          aria-label={`Set ${i + 1} weight`}
+                          className={`h-11 w-full flex-1 tabular-nums ${inputBase}`}
+                        />
+                        <DeltaBadge delta={delta} />
+                        <button
+                          onClick={() => removeSet(entry.id, s.id)}
+                          aria-label={`Remove set ${i + 1}`}
+                          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={() => addSet(entry.id)}
+                    className="mt-1 inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1.5 text-sm font-medium text-accent-strong transition-colors hover:bg-accent/10"
+                  >
+                    <Plus weight="bold" className="size-4" />
+                    Add set
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </section>
       )}
 
@@ -336,6 +374,29 @@ export default function LogWorkoutPage() {
         )}
       </section>
     </div>
+  );
+}
+
+function DeltaBadge({ delta }: { delta: number | null }) {
+  if (delta === null) return <span className="w-14" />;
+  const r = Math.round(delta * 10) / 10;
+  if (r === 0) {
+    return (
+      <span className="w-14 text-center text-xs font-medium tabular-nums text-muted-foreground">
+        ±0
+      </span>
+    );
+  }
+  const up = r > 0;
+  return (
+    <span
+      className={`w-14 text-center text-xs font-semibold tabular-nums ${
+        up ? "text-accent-strong" : "text-red-600"
+      }`}
+    >
+      {up ? "+" : ""}
+      {r}
+    </span>
   );
 }
 
