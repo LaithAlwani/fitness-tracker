@@ -5,7 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import type { Id } from "@liftify/convex/dataModel";
-import { MagnifyingGlass, Plus, Trash, X, Check } from "@phosphor-icons/react";
+import {
+  MagnifyingGlass,
+  Plus,
+  Trash,
+  X,
+  Check,
+  Timer,
+} from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 
 type SetRow = { id: string; reps: string; weight: string };
@@ -25,6 +32,38 @@ const inputBase =
   "rounded-xl border border-border bg-background px-3 text-base text-foreground " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
+const REST_DEFAULT = 90; // seconds
+
+function fmtClock(sec: number) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function beep() {
+  try {
+    const Ctx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext;
+    const ctx = new Ctx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.type = "sine";
+    o.frequency.value = 880;
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.45);
+    o.start();
+    o.stop(ctx.currentTime + 0.45);
+    o.onended = () => ctx.close();
+  } catch {
+    /* audio unavailable */
+  }
+}
+
 export default function Page() {
   return (
     <Suspense fallback={<div className="container-page py-8" />}>
@@ -37,14 +76,16 @@ function LogWorkout() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
+  const repeatId = searchParams.get("repeat");
   const isEditing = !!editId;
+  const loadId = editId ?? repeatId;
 
   const me = useQuery(api.users.me, {});
   const allExercises = useQuery(api.exercises.list, {});
   const history = useQuery(api.workouts.listForUser, { limit: 100 });
   const existingWorkout = useQuery(
     api.workouts.getById,
-    editId ? { workoutId: editId as Id<"workouts"> } : "skip",
+    loadId ? { workoutId: loadId as Id<"workouts"> } : "skip",
   );
   const create = useMutation(api.workouts.create);
   const update = useMutation(api.workouts.update);
@@ -57,6 +98,9 @@ function LogWorkout() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
+  const [restNow, setRestNow] = useState(0);
 
   const unit = me?.units ?? "lb";
 
@@ -64,31 +108,40 @@ function LogWorkout() {
   // (Edit mode loads from the saved workout instead — no draft.)
   const loaded = useRef(false);
   useEffect(() => {
-    if (isEditing) {
+    if (isEditing || repeatId) {
       loaded.current = true;
       return;
     }
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
-        const draft = JSON.parse(raw) as { name?: string; entries?: Entry[] };
+        const draft = JSON.parse(raw) as {
+          name?: string;
+          entries?: Entry[];
+          startedAt?: number;
+        };
         if (draft.name) setName(draft.name);
         if (Array.isArray(draft.entries)) setEntries(draft.entries);
+        if (typeof draft.startedAt === "number") setStartedAt(draft.startedAt);
       }
     } catch {
       /* ignore corrupt draft */
     }
     loaded.current = true;
-  }, [isEditing]);
+  }, [isEditing, repeatId]);
   useEffect(() => {
     if (!loaded.current || isEditing) return;
     try {
       if (entries.length === 0) localStorage.removeItem(DRAFT_KEY);
-      else localStorage.setItem(DRAFT_KEY, JSON.stringify({ name, entries }));
+      else
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ name, entries, startedAt }),
+        );
     } catch {
       /* storage full / unavailable */
     }
-  }, [name, entries, isEditing]);
+  }, [name, entries, startedAt, isEditing]);
 
   // Edit mode: prefill the form from the saved workout, once.
   const editLoaded = useRef(false);
@@ -108,6 +161,28 @@ function LogWorkout() {
     );
     editLoaded.current = true;
   }, [isEditing, existingWorkout]);
+
+  // Repeat mode: prefill from a past workout as a brand-new session.
+  const repeatLoaded = useRef(false);
+  useEffect(() => {
+    if (!repeatId || isEditing || repeatLoaded.current || !existingWorkout) {
+      return;
+    }
+    setName(existingWorkout.name);
+    setEntries(
+      existingWorkout.exercises.map((ex) => ({
+        id: uid(),
+        name: ex.name,
+        sets: ex.sets.map((s) => ({
+          id: uid(),
+          reps: String(s.reps),
+          weight: String(s.weight),
+        })),
+      })),
+    );
+    setStartedAt(Date.now());
+    repeatLoaded.current = true;
+  }, [repeatId, isEditing, existingWorkout]);
 
   const groups = useMemo(() => {
     if (!allExercises) return [];
@@ -153,7 +228,43 @@ function LogWorkout() {
     setScrollTarget(null);
   }, [scrollTarget]);
 
+  // Rest timer: tick while running, beep + clear at zero.
+  useEffect(() => {
+    if (restEndsAt === null) return;
+    setRestNow(Date.now());
+    const id = setInterval(() => setRestNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [restEndsAt]);
+
+  const restRemaining =
+    restEndsAt !== null
+      ? Math.max(0, Math.round((restEndsAt - restNow) / 1000))
+      : null;
+
+  useEffect(() => {
+    if (restEndsAt !== null && restRemaining === 0) {
+      beep();
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate?.(200);
+      }
+      setRestEndsAt(null);
+    }
+  }, [restRemaining, restEndsAt]);
+
+  function startRest(sec: number) {
+    setRestEndsAt(Date.now() + sec * 1000);
+  }
+  function adjustRest(delta: number) {
+    setRestEndsAt((prev) =>
+      Math.max(Date.now() + 1000, (prev ?? Date.now()) + delta * 1000),
+    );
+  }
+  function stopRest() {
+    setRestEndsAt(null);
+  }
+
   function addExercise(exName: string) {
+    if (startedAt === null) setStartedAt(Date.now());
     const existing = entries.find(
       (e) => e.name.toLowerCase() === exName.toLowerCase(),
     );
@@ -187,6 +298,7 @@ function LogWorkout() {
         return { ...e, sets: [...e.sets, next] };
       }),
     );
+    startRest(REST_DEFAULT); // auto-start rest after logging a set
   }
   function updateSet(entryId: string, setId: string, patch: Partial<SetRow>) {
     setEntries((prev) =>
@@ -222,21 +334,22 @@ function LogWorkout() {
   async function save() {
     setSaving(true);
     setError(null);
-    const payload = {
-      name,
-      exercises: entries.map((e) => ({
-        name: e.name,
-        sets: e.sets.map((s) => ({
-          reps: toNum(s.reps),
-          weight: toNum(s.weight),
-        })),
+    const exercises = entries.map((e) => ({
+      name: e.name,
+      sets: e.sets.map((s) => ({
+        reps: toNum(s.reps),
+        weight: toNum(s.weight),
       })),
-    };
+    }));
+    const durationSec =
+      startedAt !== null
+        ? Math.round((Date.now() - startedAt) / 1000)
+        : undefined;
     try {
       if (isEditing && editId) {
-        await update({ workoutId: editId as Id<"workouts">, ...payload });
+        await update({ workoutId: editId as Id<"workouts">, name, exercises });
       } else {
-        await create(payload);
+        await create({ name, durationSec, exercises });
         try {
           localStorage.removeItem(DRAFT_KEY);
         } catch {
@@ -456,6 +569,41 @@ function LogWorkout() {
           </ul>
         )}
       </section>
+
+      {/* Rest timer bar */}
+      {restRemaining !== null && (
+        <div className="fixed inset-x-0 bottom-16 z-40 px-4 sm:bottom-4">
+          <div className="mx-auto flex max-w-md items-center justify-between gap-3 rounded-full border border-border bg-card/95 px-4 py-2.5 shadow-xl backdrop-blur">
+            <div className="flex items-center gap-2">
+              <Timer weight="bold" className="size-5 text-accent-strong" />
+              <span className="font-mono text-lg tabular-nums">
+                {fmtClock(restRemaining)}
+              </span>
+              <span className="text-sm text-muted-foreground">rest</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => adjustRest(-15)}
+                className="rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+              >
+                −15
+              </button>
+              <button
+                onClick={() => adjustRest(15)}
+                className="rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+              >
+                +15
+              </button>
+              <button
+                onClick={stopRest}
+                className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-strong"
+              >
+                Skip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmOpen && (
         <div

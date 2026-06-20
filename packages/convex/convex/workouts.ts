@@ -39,9 +39,10 @@ export const create = mutation({
   args: {
     name: v.optional(v.string()),
     date: v.optional(v.number()),
+    durationSec: v.optional(v.number()),
     exercises: v.array(exerciseEntry),
   },
-  handler: async (ctx, { name, date, exercises }) => {
+  handler: async (ctx, { name, date, durationSec, exercises }) => {
     const user = await getOrCreateUser(ctx);
     requireAccess(user, Date.now());
 
@@ -54,6 +55,10 @@ export const create = mutation({
       userId: user._id,
       name: name?.trim() || "Workout",
       date: date ?? Date.now(),
+      durationSec:
+        durationSec !== undefined && durationSec > 0
+          ? Math.round(durationSec)
+          : undefined,
       exercises: cleaned,
     });
   },

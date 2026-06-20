@@ -44,6 +44,7 @@ export default defineSchema({
     userId: v.id("users"),
     name: v.string(),
     date: v.number(), // epoch ms — when the workout happened
+    durationSec: v.optional(v.number()), // how long the session took
     // Each exercise holds an ordered list of sets; weight can differ per set.
     exercises: v.array(
       v.object({

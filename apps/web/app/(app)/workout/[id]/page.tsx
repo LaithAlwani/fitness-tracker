@@ -8,6 +8,7 @@ import { api } from "@liftify/convex";
 import type { Id } from "@liftify/convex/dataModel";
 import {
   ArrowLeft,
+  ArrowsClockwise,
   PencilSimple,
   Trash,
   WarningCircle,
@@ -21,6 +22,13 @@ function fmtDate(ms: number) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function fmtDuration(sec: number) {
+  const m = Math.round(sec / 60);
+  if (m < 1) return "<1 min";
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
 export default function WorkoutDetailPage() {
@@ -91,6 +99,7 @@ export default function WorkoutDetailPage() {
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {fmtDate(workout.date)}
+            {workout.durationSec ? ` · ${fmtDuration(workout.durationSec)}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -110,6 +119,14 @@ export default function WorkoutDetailPage() {
           </button>
         </div>
       </div>
+
+      <Link
+        href={`/workout/new?repeat=${workout._id}`}
+        className={buttonClass("primary", "md", "w-full")}
+      >
+        <ArrowsClockwise weight="bold" className="size-4" />
+        Repeat this workout
+      </Link>
 
       <div className="grid grid-cols-3 gap-3">
         <Stat label="Exercises" value={String(workout.exercises.length)} />
