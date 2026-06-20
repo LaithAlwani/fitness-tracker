@@ -199,14 +199,7 @@ export default function LogWorkoutPage() {
                 className="scroll-mt-20 rounded-card border border-border bg-card p-4"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-baseline gap-x-2">
-                    <p className="font-medium">{entry.name}</p>
-                    {best !== undefined && (
-                      <span className="text-xs text-muted-foreground">
-                        best {round1(best)} {unit}
-                      </span>
-                    )}
-                  </div>
+                  <p className="font-medium">{entry.name}</p>
                   <button
                     onClick={() => removeExercise(entry.id)}
                     aria-label={`Remove ${entry.name}`}
@@ -222,7 +215,14 @@ export default function LogWorkoutPage() {
                     <span className="w-8">Set</span>
                     <span className="flex-1">Reps</span>
                     <span className="flex-1">Weight ({unit})</span>
-                    <span className="w-14 text-center">vs best</span>
+                    <span className="w-14 text-center leading-tight">
+                      vs best
+                      {best !== undefined && (
+                        <span className="block text-[10px] font-normal text-muted-foreground/70">
+                          {round1(best)} {unit}
+                        </span>
+                      )}
+                    </span>
                     <span className="w-7" />
                   </div>
                   {entry.sets.map((s, i) => {

@@ -80,7 +80,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <Ico weight={active ? "fill" : "regular"} className="size-4" />
+                  <Ico weight="regular" className="size-4" />
                   {item.label}
                 </Link>
               );

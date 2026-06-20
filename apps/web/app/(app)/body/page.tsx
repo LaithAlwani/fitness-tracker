@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
+import type { Id } from "@liftify/convex/dataModel";
 import {
   LineChart,
   Line,
@@ -11,7 +12,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Plus, CaretDown } from "@phosphor-icons/react";
+import {
+  Plus,
+  CaretDown,
+  PencilSimple,
+  Trash,
+  Check,
+  X,
+} from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 
 const MEAS_KEYS = ["waist", "chest", "arms", "hips", "thighs"] as const;
@@ -32,7 +40,14 @@ export default function BodyPage() {
   const me = useQuery(api.users.me, {});
   const entries = useQuery(api.bodyEntries.listForUser, { limit: 365 });
   const create = useMutation(api.bodyEntries.create);
+  const update = useMutation(api.bodyEntries.update);
+  const removeEntry = useMutation(api.bodyEntries.remove);
   const unit = me?.units ?? "lb";
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editWeight, setEditWeight] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
 
   const [open, setOpen] = useState(false);
   const [weight, setWeight] = useState("");
@@ -80,6 +95,28 @@ export default function BodyPage() {
       setError(e instanceof Error ? e.message : "Could not save entry.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function startEdit(id: string, w: number, n?: string) {
+    setEditingId(id);
+    setEditWeight(String(w));
+    setEditNotes(n ?? "");
+    setEditError(null);
+  }
+
+  async function saveEdit(entryId: Id<"bodyEntries">) {
+    setEditError(null);
+    const w = Number(editWeight);
+    if (!(w > 0)) {
+      setEditError("Enter a valid weight.");
+      return;
+    }
+    try {
+      await update({ entryId, weight: w, notes: editNotes });
+      setEditingId(null);
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "Could not save.");
     }
   }
 
@@ -225,22 +262,90 @@ export default function BodyPage() {
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-medium text-muted-foreground">History</h2>
           <ul className="flex flex-col gap-2">
-            {entries.slice(0, 30).map((e) => (
-              <li
-                key={e._id}
-                className="flex items-center justify-between rounded-xl border border-border px-4 py-3"
-              >
-                <div>
-                  <p className="font-medium tabular-nums">
-                    {e.weight} {unit}
-                  </p>
-                  {e.notes && (
-                    <p className="text-sm text-muted-foreground">{e.notes}</p>
+            {entries.slice(0, 60).map((e) =>
+              editingId === e._id ? (
+                <li
+                  key={e._id}
+                  className="rounded-xl border border-accent-strong/40 bg-card p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
+                      Weight ({unit})
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.1"
+                        min="0"
+                        autoFocus
+                        value={editWeight}
+                        onChange={(ev) => setEditWeight(ev.target.value)}
+                        className={`h-11 ${inputBase}`}
+                      />
+                    </label>
+                    <label className="flex flex-[2] flex-col gap-1 text-xs text-muted-foreground">
+                      Notes
+                      <input
+                        value={editNotes}
+                        onChange={(ev) => setEditNotes(ev.target.value)}
+                        className={`h-11 ${inputBase}`}
+                      />
+                    </label>
+                  </div>
+                  {editError && (
+                    <p className="mt-2 text-sm text-red-600">{editError}</p>
                   )}
-                </div>
-                <p className="text-sm text-muted-foreground">{shortDate(e.date)}</p>
-              </li>
-            ))}
+                  <div className="mt-3 flex justify-end gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setEditingId(null)}
+                    >
+                      <X className="size-4" />
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={() => saveEdit(e._id)}>
+                      <Check weight="bold" className="size-4" />
+                      Save
+                    </Button>
+                  </div>
+                </li>
+              ) : (
+                <li
+                  key={e._id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium tabular-nums">
+                      {e.weight} {unit}
+                    </p>
+                    {e.notes && (
+                      <p className="truncate text-sm text-muted-foreground">
+                        {e.notes}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="mr-1 text-sm text-muted-foreground">
+                      {shortDate(e.date)}
+                    </span>
+                    <button
+                      onClick={() => startEdit(e._id, e.weight, e.notes)}
+                      aria-label="Edit entry"
+                      className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      <PencilSimple className="size-4" />
+                    </button>
+                    <button
+                      onClick={() => removeEntry({ entryId: e._id })}
+                      aria-label="Delete entry"
+                      className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
+                    >
+                      <Trash className="size-4" />
+                    </button>
+                  </div>
+                </li>
+              ),
+            )}
           </ul>
         </section>
       )}

@@ -46,6 +46,27 @@ export const listForUser = query({
   },
 });
 
+export const update = mutation({
+  args: {
+    entryId: v.id("bodyEntries"),
+    weight: v.optional(v.number()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, { entryId, weight, notes }) => {
+    const user = await getCurrentUserOrThrow(ctx);
+    const entry = await ctx.db.get(entryId);
+    if (!entry || entry.userId !== user._id) throw new Error("Entry not found");
+
+    const patch: { weight?: number; notes?: string | undefined } = {};
+    if (weight !== undefined) {
+      if (!(weight > 0)) throw new Error("Enter a valid weight");
+      patch.weight = weight;
+    }
+    if (notes !== undefined) patch.notes = notes.trim() || undefined;
+    await ctx.db.patch(entryId, patch);
+  },
+});
+
 export const remove = mutation({
   args: { entryId: v.id("bodyEntries") },
   handler: async (ctx, { entryId }) => {
