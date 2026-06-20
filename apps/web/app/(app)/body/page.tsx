@@ -268,6 +268,16 @@ export default function BodyPage() {
                   key={e._id}
                   className="rounded-xl border border-accent-strong/40 bg-card p-4"
                 >
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      aria-label="Cancel"
+                      onClick={() => setEditingId(null)}
+                      className="-mr-1 -mt-1 flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                     <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
                       Weight ({unit})
@@ -298,28 +308,21 @@ export default function BodyPage() {
                     <Button
                       variant="danger"
                       size="sm"
+                      aria-label="Delete entry"
                       onClick={() => {
                         removeEntry({ entryId: e._id });
                         setEditingId(null);
                       }}
                     >
                       <Trash className="size-4" />
-                      Delete
                     </Button>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setEditingId(null)}
-                      >
-                        <X className="size-4" />
-                        Cancel
-                      </Button>
-                      <Button size="sm" onClick={() => saveEdit(e._id)}>
-                        <Check weight="bold" className="size-4" />
-                        Save
-                      </Button>
-                    </div>
+                    <Button
+                      size="sm"
+                      aria-label="Save"
+                      onClick={() => saveEdit(e._id)}
+                    >
+                      <Check weight="bold" className="size-4" />
+                    </Button>
                   </div>
                 </li>
               ) : (
