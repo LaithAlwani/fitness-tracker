@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
-import { UserButton } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import {
@@ -11,7 +11,6 @@ import {
   Barbell,
   Scales,
   ChartLineUp,
-  Gear,
   type Icon,
 } from "@phosphor-icons/react";
 import { NotificationBell } from "@/components/notification-bell";
@@ -30,9 +29,16 @@ function isActive(pathname: string, href: string) {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useUser();
   const ensureUser = useMutation(api.users.getOrCreateCurrentUser);
   const ensureWeekly = useMutation(api.notifications.ensureWeekly);
   const access = useQuery(api.users.accessState);
+
+  const initial = (
+    user?.firstName?.[0] ??
+    user?.primaryEmailAddress?.emailAddress?.[0] ??
+    "U"
+  ).toUpperCase();
 
   // Create the user row (and start the trial) on first authenticated load,
   // then make sure this week's reminder exists.
@@ -88,20 +94,28 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <NotificationBell />
             <Link
               href="/settings"
-              aria-label="Settings"
-              className={`flex size-9 items-center justify-center rounded-full transition-colors hover:bg-muted ${
+              aria-label="Account & settings"
+              className={`flex size-9 items-center justify-center overflow-hidden rounded-full border bg-muted text-sm font-semibold text-foreground transition-colors ${
                 pathname.startsWith("/settings")
-                  ? "text-accent-strong"
-                  : "text-foreground"
+                  ? "border-accent-strong"
+                  : "border-border hover:border-accent-strong/40"
               }`}
             >
-              <Gear className="size-5" />
+              {user?.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.imageUrl}
+                  alt=""
+                  className="size-full object-cover"
+                />
+              ) : (
+                <span>{initial}</span>
+              )}
             </Link>
-            <UserButton />
           </div>
         </div>
       </header>

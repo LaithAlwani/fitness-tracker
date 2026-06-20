@@ -1,7 +1,12 @@
 import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
-import { getCurrentUser, hasAccess, TRIAL_MS } from "./model";
+import {
+  getCurrentUser,
+  getCurrentUserOrThrow,
+  hasAccess,
+  TRIAL_MS,
+} from "./model";
 
 // Called on first authenticated load. Creates the user row if missing and keeps
 // the profile in sync with Clerk. New users start a no-card 30-day trial so the
@@ -86,5 +91,34 @@ export const setUnits = mutation({
       .unique();
     if (!user) throw new Error("User row missing");
     await ctx.db.patch(user._id, { units });
+  },
+});
+
+// Wipes all of the current user's data + their user row. The Clerk account is
+// deleted separately by the /api/delete-account route handler.
+export const deleteAccount = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUserOrThrow(ctx);
+
+    const workouts = await ctx.db
+      .query("workouts")
+      .withIndex("by_user_date", (q) => q.eq("userId", user._id))
+      .collect();
+    for (const w of workouts) await ctx.db.delete(w._id);
+
+    const entries = await ctx.db
+      .query("bodyEntries")
+      .withIndex("by_user_date", (q) => q.eq("userId", user._id))
+      .collect();
+    for (const e of entries) await ctx.db.delete(e._id);
+
+    const notes = await ctx.db
+      .query("notifications")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    for (const n of notes) await ctx.db.delete(n._id);
+
+    await ctx.db.delete(user._id);
   },
 });
