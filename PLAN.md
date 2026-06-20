@@ -15,9 +15,11 @@ auth but only scaffolded UI. The decision is to **abandon the mobile app** and s
 
 The product is deliberately tiny: **"Track workouts fast and see progress over time."**
 Bar for shippable = a new user logs their first workout in **under 30 seconds**, zero
-onboarding. Monetization is a **single flat $6.99/mo Stripe subscription** (Free = logging,
-Pro = charts/analytics). UI quality comes from a **shared design system** driven by the
-`taste-skill` agent skill, used identically across both repos.
+onboarding. Monetization is **paid-only**: a **30-day free trial → $7.99/mo** Stripe
+subscription. There is **no free tier** — the whole app is gated behind an active/trialing
+subscription. In-app promo offers (e.g. ~$2.99/mo for 6 months) are delivered via Stripe
+coupons. UI quality comes from a **shared design system** driven by the `taste-skill` agent
+skill, used identically across both repos.
 
 > ⚠️ Both repos use a **customized Next.js 16** ("NOT the Next.js you know" per `AGENTS.md`).
 > Before writing any Next.js code, read the relevant guide in `node_modules/next/dist/docs/`
@@ -57,7 +59,9 @@ Pro = charts/analytics). UI quality comes from a **shared design system** driven
 Rewrite `packages/convex/convex/schema.ts` down to:
 ```ts
 users       { clerkId, email, firstName?, lastName?, units: "kg"|"lb",
-              plan: "free"|"pro", stripeCustomerId?, createdAt }   // idx: by_clerk_id
+              stripeCustomerId?, stripeSubscriptionId?,
+              subscriptionStatus: "none"|"trialing"|"active"|"past_due"|"canceled",
+              currentPeriodEnd?, createdAt }                       // idx: by_clerk_id
 workouts    { userId, name, date, exercises: [ { name, sets, reps, weight } ] }  // idx: by_user
 bodyEntries { userId, date, weight, notes?, measurements?: { waist?, arms?, chest?, ... } } // idx: by_user
 ```
@@ -72,7 +76,9 @@ bodyEntries { userId, date, weight, notes?, measurements?: { waist?, arms?, ches
 ### 2c. Auth (Clerk)
 - [ ] `@clerk/nextjs` + `ConvexProviderWithClerk` + `clerkMiddleware` gating `(app)`.
 - [ ] Configure Clerk for `app.liftify.com`. Keep `CLERK_JWT_ISSUER_DOMAIN` on Convex.
-- [ ] First authed load → `users.getOrCreateCurrentUser` (mints row, `plan:"free"`).
+- [ ] First authed load → `users.getOrCreateCurrentUser` (mints row, `subscriptionStatus:"none"`).
+- [ ] **Access gate:** all `(app)` screens require `subscriptionStatus` ∈ {trialing, active}.
+      Otherwise redirect to a `/subscribe` paywall (start trial / enter offer code).
 
 ### 2d. Screens (App Router) — 4 screens + upgrade
 ```
@@ -86,14 +92,22 @@ app/manifest.ts                 # PWA manifest
 middleware.ts                   # clerkMiddleware
 ```
 - [ ] **Log Workout** = the heart — fast entry, autofocus, sane defaults (30-sec test).
-- [ ] Free vs Pro: logging + latest numbers = **Free**; all charts = **Pro** (gate on `users.plan`).
+- [ ] No per-feature gating — full app is paid; access is the subscription gate (2c).
+      Add a `/subscribe` paywall screen for `none`/lapsed users (start trial · apply offer code).
 
-### 2e. Stripe billing — flat $6.99/mo (all in Convex)
-- [ ] Stripe product + one recurring monthly price ($6.99) → `STRIPE_PRICE_ID`.
-- [ ] `billing.createCheckoutSession` Convex **action** → Checkout URL; store `stripeCustomerId`.
-- [ ] `convex/http.ts` **HTTP action** = Stripe webhook: verify sig, set `plan` pro/free.
-- [ ] Customer Portal link + **Upgrade** modal behind every Pro chart.
+### 2e. Stripe billing — $7.99/mo, 30-day trial (all in Convex)
+- [ ] Stripe product + one recurring monthly price ($7.99) → `STRIPE_PRICE_ID`.
+- [ ] `billing.createCheckoutSession` Convex **action** → Checkout (subscription mode,
+      `trial_period_days: 30`, `allow_promotion_codes: true`); store `stripeCustomerId`.
+- [ ] **In-app offers:** Stripe coupons / promotion codes (e.g. `duration: repeating`,
+      `duration_in_months: 6`, ~$5 off → ≈$2.99/mo for 6 months). Surface in `/subscribe`
+      and as a retention offer; apply via Checkout `discounts` or to the live subscription.
+- [ ] `convex/http.ts` **HTTP action** = Stripe webhook: verify sig; sync
+      `subscriptionStatus` + `currentPeriodEnd` from `customer.subscription.*` events.
+- [ ] Customer Portal link to manage/cancel.
 - [ ] Convex env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`.
+- [ ] **OPEN DECISION:** card-required trial (Checkout up front, auto-converts — default) vs
+      no-card trial (track trial in-app, collect card at conversion). Default = card-required.
 
 ### 2f. PWA + polish
 - [ ] `app/manifest.ts` + **Serwist** (`@serwist/next`) service worker (precache shell).
@@ -105,7 +119,7 @@ middleware.ts                   # clerkMiddleware
 ## 3. Marketing site (`liftify.com`) — separate repo
 - [ ] Landing page (shared tokens + design-taste-frontend): hero one-promise headline ·
       3 feature blurbs (fast logging · progress charts · body journal) · pricing card
-      ($6.99/mo) · CTAs → `app.liftify.com/sign-up`.
+      ($7.99/mo, 30-day free trial) · CTAs → `app.liftify.com/sign-up`.
 - [ ] Footer + Privacy / Terms stubs (required before taking payments).
 
 ---
@@ -129,9 +143,10 @@ two, HealthKit/Google Fit, offline-write, additional marketing pages. Also: rewr
 ## Verification
 - **Backend:** `npm run convex:dev`; confirm the 3 tables; run `workouts.create` /
   `bodyEntries.create` / `users.getOrCreateCurrentUser`.
-- **App e2e:** `npm run web`; sign in (Clerk) → log a workout in < 30s → see it on Home →
-  add a body entry → confirm charts are locked on Free.
-- **Billing:** Stripe test card through Checkout → webhook flips `users.plan` → `pro`; cancel
-  via Customer Portal → reverts to `free`.
+- **App e2e:** `npm run web`; sign in (Clerk) → hit the `/subscribe` gate → start trial →
+  log a workout in < 30s → see it on Home → add a body entry.
+- **Billing:** Stripe test card through Checkout (30-day trial) → webhook sets
+  `subscriptionStatus` `trialing`→`active`; apply an offer coupon → discounted; cancel via
+  Customer Portal → `canceled` and the app re-gates.
 - **PWA:** Lighthouse PWA pass; install to home screen and launch standalone.
 - **Design parity:** `globals.css` token block identical in both repos.
