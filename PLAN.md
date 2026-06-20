@@ -110,9 +110,16 @@ middleware.ts                   # clerkMiddleware
       no-card trial (track trial in-app, collect card at conversion). Default = card-required.
 
 ### 2f. PWA + polish
-- [ ] `app/manifest.ts` + **Serwist** (`@serwist/next`) service worker (precache shell).
-      (Offline writes out of MVP — Convex needs network.)
-- [ ] Installable on mobile Safari + Chrome. Polish: empty/loading states, kg/lb toggle.
+- [x] `app/manifest.ts` + icons (192/512 + maskable) + a minimal online-first service
+      worker (precache shell; Serwist deferred). Installable. (Offline writes out of MVP.)
+- [ ] Verify "Add to Home Screen" on a real phone (Safari + Chrome).
+- [x] kg/lb toggle in **Settings**. Remaining polish: more empty/loading states.
+
+### 2g. Extras built beyond the MVP plan
+- [x] Per-set logging ("Add set" duplicates previous); +/- vs all-time best; prefill best weight.
+- [x] In-progress workout persists across nav; Finish confirm dialog; edit a saved workout.
+- [x] Weekly body-weight reminder + notification bell (lazy + weekly cron).
+- [x] Editable body-weight history; Settings (units / account / membership / sign out).
 
 ---
 
