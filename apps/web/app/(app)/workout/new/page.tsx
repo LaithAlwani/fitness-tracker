@@ -96,9 +96,12 @@ export default function LogWorkoutPage() {
       return;
     }
     const id = uid();
+    // Pre-fill the first set's weight with your best for this exercise, if known.
+    const best = bestByExercise.get(exName.toLowerCase());
+    const weight = best !== undefined ? String(round1(best)) : "";
     setEntries((prev) => [
       ...prev,
-      { id, name: exName, sets: [{ id: uid(), reps: "", weight: "" }] },
+      { id, name: exName, sets: [{ id: uid(), reps: "", weight }] },
     ]);
     setScrollTarget(id);
   }
