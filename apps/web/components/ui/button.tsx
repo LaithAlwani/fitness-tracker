@@ -1,0 +1,44 @@
+import * as React from "react";
+
+type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Size = "sm" | "md" | "lg";
+
+const base =
+  "inline-flex items-center justify-center gap-2 rounded-full font-medium " +
+  "transition-[background-color,transform,border-color] duration-150 " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+  "focus-visible:ring-offset-2 focus-visible:ring-offset-background " +
+  "active:translate-y-px disabled:pointer-events-none disabled:opacity-50";
+
+const variants: Record<Variant, string> = {
+  primary: "bg-accent text-accent-foreground hover:bg-accent-strong",
+  secondary: "border border-border bg-card text-foreground hover:bg-muted",
+  ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
+  danger: "text-red-600 hover:bg-red-500/10",
+};
+
+const sizes: Record<Size, string> = {
+  sm: "h-9 px-4 text-sm",
+  md: "h-10 px-5 text-sm",
+  lg: "h-12 px-7 text-base",
+};
+
+export function buttonClass(
+  variant: Variant = "primary",
+  size: Size = "md",
+  extra = "",
+) {
+  return `${base} ${variants[variant]} ${sizes[size]} ${extra}`.trim();
+}
+
+export function Button({
+  variant,
+  size,
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: Variant;
+  size?: Size;
+}) {
+  return <button className={buttonClass(variant, size, className)} {...props} />;
+}

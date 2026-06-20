@@ -1,0 +1,114 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
+import { UserButton } from "@clerk/nextjs";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@liftify/convex";
+import {
+  House,
+  Barbell,
+  Scales,
+  ChartLineUp,
+  type Icon,
+} from "@phosphor-icons/react";
+
+const NAV: { href: string; label: string; icon: Icon }[] = [
+  { href: "/", label: "Home", icon: House },
+  { href: "/workout/new", label: "Log", icon: Barbell },
+  { href: "/body", label: "Body", icon: Scales },
+  { href: "/progress", label: "Progress", icon: ChartLineUp },
+];
+
+function isActive(pathname: string, href: string) {
+  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const ensureUser = useMutation(api.users.getOrCreateCurrentUser);
+  const access = useQuery(api.users.accessState);
+
+  // Create the user row (and start the trial) on first authenticated load.
+  useEffect(() => {
+    ensureUser().catch(() => {});
+  }, [ensureUser]);
+
+  // Gate: send lapsed users to the paywall.
+  useEffect(() => {
+    if (
+      access?.authenticated &&
+      !access.hasAccess &&
+      pathname !== "/subscribe"
+    ) {
+      router.replace("/subscribe");
+    }
+  }, [access, pathname, router]);
+
+  return (
+    <div className="flex min-h-full flex-1 flex-col">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
+        <div className="container-page flex h-16 items-center justify-between">
+          <Link
+            href="/"
+            className="flex items-center gap-2 font-semibold tracking-tight"
+          >
+            <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+              <Barbell weight="bold" className="size-5" />
+            </span>
+            Liftify
+          </Link>
+
+          <nav className="hidden items-center gap-1 sm:flex">
+            {NAV.map((item) => {
+              const active = isActive(pathname, item.href);
+              const Ico = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Ico weight={active ? "fill" : "regular"} className="size-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <UserButton />
+        </div>
+      </header>
+
+      <main className="flex-1 pb-24 sm:pb-12">{children}</main>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 backdrop-blur-md sm:hidden">
+        <div className="mx-auto flex max-w-md items-stretch justify-around">
+          {NAV.map((item) => {
+            const active = isActive(pathname, item.href);
+            const Ico = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-xs ${
+                  active ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <Ico weight={active ? "fill" : "regular"} className="size-6" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    </div>
+  );
+}
