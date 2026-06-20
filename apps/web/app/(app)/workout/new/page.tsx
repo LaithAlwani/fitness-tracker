@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
+import type { Id } from "@liftify/convex/dataModel";
 import { MagnifyingGlass, Plus, Trash, X, Check } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 
@@ -24,12 +25,29 @@ const inputBase =
   "rounded-xl border border-border bg-background px-3 text-base text-foreground " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-export default function LogWorkoutPage() {
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="container-page py-8" />}>
+      <LogWorkout />
+    </Suspense>
+  );
+}
+
+function LogWorkout() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+  const isEditing = !!editId;
+
   const me = useQuery(api.users.me, {});
   const allExercises = useQuery(api.exercises.list, {});
   const history = useQuery(api.workouts.listForUser, { limit: 100 });
+  const existingWorkout = useQuery(
+    api.workouts.getById,
+    editId ? { workoutId: editId as Id<"workouts"> } : "skip",
+  );
   const create = useMutation(api.workouts.create);
+  const update = useMutation(api.workouts.update);
 
   const [name, setName] = useState("Workout");
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -42,9 +60,14 @@ export default function LogWorkoutPage() {
 
   const unit = me?.units ?? "lb";
 
-  // Persist the in-progress workout so leaving and returning keeps everything.
+  // Persist the in-progress NEW workout so leaving and returning keeps it.
+  // (Edit mode loads from the saved workout instead — no draft.)
   const loaded = useRef(false);
   useEffect(() => {
+    if (isEditing) {
+      loaded.current = true;
+      return;
+    }
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
@@ -56,16 +79,35 @@ export default function LogWorkoutPage() {
       /* ignore corrupt draft */
     }
     loaded.current = true;
-  }, []);
+  }, [isEditing]);
   useEffect(() => {
-    if (!loaded.current) return;
+    if (!loaded.current || isEditing) return;
     try {
       if (entries.length === 0) localStorage.removeItem(DRAFT_KEY);
       else localStorage.setItem(DRAFT_KEY, JSON.stringify({ name, entries }));
     } catch {
       /* storage full / unavailable */
     }
-  }, [name, entries]);
+  }, [name, entries, isEditing]);
+
+  // Edit mode: prefill the form from the saved workout, once.
+  const editLoaded = useRef(false);
+  useEffect(() => {
+    if (!isEditing || editLoaded.current || !existingWorkout) return;
+    setName(existingWorkout.name);
+    setEntries(
+      existingWorkout.exercises.map((ex) => ({
+        id: uid(),
+        name: ex.name,
+        sets: ex.sets.map((s) => ({
+          id: uid(),
+          reps: String(s.reps),
+          weight: String(s.weight),
+        })),
+      })),
+    );
+    editLoaded.current = true;
+  }, [isEditing, existingWorkout]);
 
   const groups = useMemo(() => {
     if (!allExercises) return [];
@@ -180,21 +222,26 @@ export default function LogWorkoutPage() {
   async function save() {
     setSaving(true);
     setError(null);
-    try {
-      await create({
-        name,
-        exercises: entries.map((e) => ({
-          name: e.name,
-          sets: e.sets.map((s) => ({
-            reps: toNum(s.reps),
-            weight: toNum(s.weight),
-          })),
+    const payload = {
+      name,
+      exercises: entries.map((e) => ({
+        name: e.name,
+        sets: e.sets.map((s) => ({
+          reps: toNum(s.reps),
+          weight: toNum(s.weight),
         })),
-      });
-      try {
-        localStorage.removeItem(DRAFT_KEY);
-      } catch {
-        /* ignore */
+      })),
+    };
+    try {
+      if (isEditing && editId) {
+        await update({ workoutId: editId as Id<"workouts">, ...payload });
+      } else {
+        await create(payload);
+        try {
+          localStorage.removeItem(DRAFT_KEY);
+        } catch {
+          /* ignore */
+        }
       }
       router.push("/");
     } catch (e) {
@@ -220,7 +267,7 @@ export default function LogWorkoutPage() {
         />
         <Button onClick={requestFinish} disabled={saving || entries.length === 0}>
           <Check weight="bold" className="size-4" />
-          Finish
+          {isEditing ? "Save" : "Finish"}
         </Button>
       </div>
 
@@ -422,11 +469,13 @@ export default function LogWorkoutPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-lg font-semibold tracking-tight">
-              Finish workout?
+              {isEditing ? "Save changes?" : "Finish workout?"}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Save &ldquo;{name.trim() || "Workout"}&rdquo; with {entries.length}{" "}
-              exercise{entries.length === 1 ? "" : "s"} to your history?
+              {isEditing ? "Update " : "Save "}
+              &ldquo;{name.trim() || "Workout"}&rdquo; with {entries.length}{" "}
+              exercise{entries.length === 1 ? "" : "s"}
+              {isEditing ? " in" : " to"} your history?
             </p>
             {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
             <div className="mt-6 flex justify-end gap-2">
@@ -438,7 +487,11 @@ export default function LogWorkoutPage() {
                 Keep going
               </Button>
               <Button onClick={save} disabled={saving}>
-                {saving ? "Saving…" : "Finish workout"}
+                {saving
+                  ? "Saving…"
+                  : isEditing
+                    ? "Save changes"
+                    : "Finish workout"}
               </Button>
             </div>
           </div>

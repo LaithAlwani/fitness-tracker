@@ -13,6 +13,23 @@ const exerciseEntry = v.object({
   sets: v.array(setEntry),
 });
 
+type ExerciseInput = { name: string; sets: { reps: number; weight: number }[] };
+
+function cleanExercises(exercises: ExerciseInput[]) {
+  return exercises
+    .map((e) => ({
+      name: e.name.trim(),
+      sets: e.sets
+        .map((s) => ({
+          reps: Math.max(0, Math.round(s.reps)),
+          weight: Math.max(0, s.weight),
+        }))
+        // keep a set if it records reps or weight (weight 0 = bodyweight)
+        .filter((s) => s.reps > 0 || s.weight > 0),
+    }))
+    .filter((e) => e.name.length > 0 && e.sets.length > 0);
+}
+
 export const create = mutation({
   args: {
     name: v.optional(v.string()),
@@ -23,19 +40,7 @@ export const create = mutation({
     const user = await getCurrentUserOrThrow(ctx);
     requireAccess(user, Date.now());
 
-    const cleaned = exercises
-      .map((e) => ({
-        name: e.name.trim(),
-        sets: e.sets
-          .map((s) => ({
-            reps: Math.max(0, Math.round(s.reps)),
-            weight: Math.max(0, s.weight),
-          }))
-          // keep a set if it records reps or weight (weight 0 = bodyweight)
-          .filter((s) => s.reps > 0 || s.weight > 0),
-      }))
-      .filter((e) => e.name.length > 0 && e.sets.length > 0);
-
+    const cleaned = cleanExercises(exercises);
     if (cleaned.length === 0) {
       throw new Error("Add at least one exercise with a set");
     }
@@ -44,6 +49,42 @@ export const create = mutation({
       userId: user._id,
       name: name?.trim() || "Workout",
       date: date ?? Date.now(),
+      exercises: cleaned,
+    });
+  },
+});
+
+export const getById = query({
+  args: { workoutId: v.id("workouts") },
+  handler: async (ctx, { workoutId }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) return null;
+    const workout = await ctx.db.get(workoutId);
+    if (!workout || workout.userId !== user._id) return null;
+    return workout;
+  },
+});
+
+export const update = mutation({
+  args: {
+    workoutId: v.id("workouts"),
+    name: v.optional(v.string()),
+    exercises: v.array(exerciseEntry),
+  },
+  handler: async (ctx, { workoutId, name, exercises }) => {
+    const user = await getCurrentUserOrThrow(ctx);
+    const workout = await ctx.db.get(workoutId);
+    if (!workout || workout.userId !== user._id) {
+      throw new Error("Workout not found");
+    }
+
+    const cleaned = cleanExercises(exercises);
+    if (cleaned.length === 0) {
+      throw new Error("Add at least one exercise with a set");
+    }
+
+    await ctx.db.patch(workoutId, {
+      name: name?.trim() || workout.name,
       exercises: cleaned,
     });
   },
