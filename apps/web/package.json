@@ -3,13 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6",
+    "@liftify/convex": "*",
+    "@phosphor-icons/react": "^2.1.10",
+    "convex": "^1.17.4",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4"

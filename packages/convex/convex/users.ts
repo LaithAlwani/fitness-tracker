@@ -1,64 +1,77 @@
 import { v } from "convex/values";
 
 import { mutation, query } from "./_generated/server";
+import { getCurrentUser, hasAccess, TRIAL_MS } from "./model";
 
+// Called on first authenticated load. Creates the user row if missing and keeps
+// the profile in sync with Clerk. New users start a no-card 30-day trial so the
+// app is immediately usable; once Stripe is wired its webhook owns the status.
 export const getOrCreateCurrentUser = mutation({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    if (!identity) throw new Error("Not authenticated");
 
-    const existingUser = await ctx.db
+    const existing = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
 
-    if (existingUser) {
-      const needsNameUpdate =
-        identity.givenName && existingUser.firstName !== identity.givenName;
-      const needsLastNameUpdate =
-        identity.familyName && existingUser.lastName !== identity.familyName;
-      const needsEmailUpdate =
-        identity.email && existingUser.email !== identity.email;
-
-      if (needsNameUpdate || needsLastNameUpdate || needsEmailUpdate) {
-        await ctx.db.patch(existingUser._id, {
-          firstName: identity.givenName ?? existingUser.firstName,
-          lastName: identity.familyName ?? existingUser.lastName,
-          email: identity.email ?? existingUser.email,
-        });
+    if (existing) {
+      const patch: Partial<
+        Pick<typeof existing, "firstName" | "lastName" | "email">
+      > = {};
+      if (identity.givenName && existing.firstName !== identity.givenName) {
+        patch.firstName = identity.givenName;
       }
-
-      return existingUser._id;
+      if (identity.familyName && existing.lastName !== identity.familyName) {
+        patch.lastName = identity.familyName;
+      }
+      if (identity.email && existing.email !== identity.email) {
+        patch.email = identity.email;
+      }
+      if (Object.keys(patch).length > 0) await ctx.db.patch(existing._id, patch);
+      return existing._id;
     }
 
-    const userId = await ctx.db.insert("users", {
+    const now = Date.now();
+    return await ctx.db.insert("users", {
       clerkId: identity.subject,
       email: identity.email ?? "",
-      firstName: identity.givenName ?? "",
-      lastName: identity.familyName ?? "",
+      firstName: identity.givenName ?? undefined,
+      lastName: identity.familyName ?? undefined,
       units: "kg",
-      createdAt: Date.now(),
+      subscriptionStatus: "trialing",
+      trialEndsAt: now + TRIAL_MS,
+      createdAt: now,
     });
-
-    return userId;
   },
 });
 
 export const me = query({
   args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return null;
-    }
+  handler: async (ctx) => getCurrentUser(ctx),
+});
 
-    return await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+// Drives the (app) access gate.
+export const accessState = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) {
+      return {
+        authenticated: false,
+        hasAccess: false,
+        status: "none" as const,
+        trialEndsAt: undefined as number | undefined,
+      };
+    }
+    return {
+      authenticated: true,
+      hasAccess: hasAccess(user, Date.now()),
+      status: user.subscriptionStatus,
+      trialEndsAt: user.trialEndsAt,
+    };
   },
 });
 
@@ -73,37 +86,5 @@ export const setUnits = mutation({
       .unique();
     if (!user) throw new Error("User row missing");
     await ctx.db.patch(user._id, { units });
-  },
-});
-
-export const setDailyReminder = mutation({
-  args: {
-    enabled: v.boolean(),
-    hour: v.optional(v.number()),
-    minute: v.optional(v.number()),
-  },
-  handler: async (ctx, { enabled, hour, minute }) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
-    if (!user) throw new Error("User row missing");
-
-    const patch: {
-      dailyReminderEnabled: boolean;
-      dailyReminderHour?: number;
-      dailyReminderMinute?: number;
-    } = { dailyReminderEnabled: enabled };
-    if (hour !== undefined) {
-      if (hour < 0 || hour > 23) throw new Error("hour must be 0-23");
-      patch.dailyReminderHour = hour;
-    }
-    if (minute !== undefined) {
-      if (minute < 0 || minute > 59) throw new Error("minute must be 0-59");
-      patch.dailyReminderMinute = minute;
-    }
-    await ctx.db.patch(user._id, patch);
   },
 });
