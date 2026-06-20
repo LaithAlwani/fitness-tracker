@@ -1,4 +1,4 @@
-// @fitness/shared — pure TypeScript only (no React, no Expo, no native imports).
+// @liftify/shared — pure TypeScript only (no React, no Expo, no native imports).
 //
 // XP, achievements, quests, PR detection, unit conversion, formatters all live here
 // so Convex mutations and the mobile UI evaluate the same code.

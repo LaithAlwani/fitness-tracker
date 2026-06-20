@@ -1,5 +1,5 @@
 {
-  "name": "@fitness/convex",
+  "name": "@liftify/convex",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -21,11 +21,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fitness/shared": "workspace:*",
+    "@liftify/shared": "*",
     "convex": "^1.17.4"
   },
   "devDependencies": {
-    "@fitness/tsconfig": "workspace:*",
+    "@liftify/tsconfig": "*",
     "typescript": "^5.7.2"
   }
 }

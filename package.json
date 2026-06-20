@@ -1,29 +1,27 @@
 {
-  "name": "fitness-tracker",
+  "name": "liftify",
   "version": "0.0.0",
   "private": true,
-  "description": "Mobile-first fitness tracker (Expo + Convex + Clerk) with Duolingo-style gamification.",
-  "packageManager": "pnpm@9.15.0",
+  "description": "Liftify — fast workout tracker web PWA (Next.js + Convex + Clerk).",
   "engines": {
     "node": ">=20.0.0"
   },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "mobile": "pnpm --filter @fitness/mobile exec expo start",
-    "convex:dev": "pnpm --filter @fitness/convex exec convex dev",
-    "convex:deploy": "pnpm --filter @fitness/convex exec convex deploy"
+    "web": "npm run dev --workspace @liftify/web",
+    "convex:dev": "npm exec --workspace @liftify/convex -- convex dev",
+    "convex:deploy": "npm exec --workspace @liftify/convex -- convex deploy"
   },
   "devDependencies": {
     "turbo": "^2.3.3",
     "typescript": "^5.7.2"
-  },
-  "pnpm": {
-    "overrides": {
-      "expo-crypto": "~15.0.9"
-    }
   }
 }

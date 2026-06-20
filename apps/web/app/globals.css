@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/* =====================================================================
+   Liftify shared design tokens  (mirror of the marketing repo's app/globals.css)
+   Athletic-minimal: zinc/ink neutrals + one volt-lime brand accent.
+   Keep this :root + @theme + .container-page block identical in both
+   repos so colors and margins match on marketing and app.
+   ===================================================================== */
+
+:root {
+  /* Neutrals (zinc-based ink) */
+  --background: #ffffff;
+  --foreground: #18181b;        /* zinc-900 */
+  --muted: #f4f4f5;             /* zinc-100 — subtle surfaces */
+  --muted-foreground: #71717a;  /* zinc-500 — secondary text */
+  --card: #ffffff;
+  --border: #e4e4e7;            /* zinc-200 */
+  --ring: #a3e635;
+
+  /* Brand — CoreVex Volt */
+  --accent: #a3e635;            /* volt lime — CTAs, energy, progress */
+  --accent-foreground: #0a0a0a; /* near-black text on volt */
+  --accent-strong: #84cc16;     /* hover / pressed */
+
+  /* Shape */
+  --radius: 0.875rem;           /* 14px — cards */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #fafafa;       /* zinc-50 */
+    --muted: #18181b;            /* zinc-900 */
+    --muted-foreground: #a1a1aa; /* zinc-400 */
+    --card: #111113;
+    --border: #27272a;           /* zinc-800 */
+    --ring: #a3e635;
+    --accent: #bef264;           /* brighter volt on dark */
+    --accent-foreground: #0a0a0a;
+    --accent-strong: #a3e635;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-strong: var(--accent-strong);
+
+  --radius-card: var(--radius);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Shared layout rhythm — identical margins across marketing + app.
+   Page gutters: 20px mobile / 32px ≥640px, capped at 72rem. */
+.container-page {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 72rem;       /* max-w-6xl */
+  padding-inline: 1.25rem;
+}
+@media (min-width: 640px) {
+  .container-page { padding-inline: 2rem; }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}

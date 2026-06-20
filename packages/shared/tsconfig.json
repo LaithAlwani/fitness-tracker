@@ -1,5 +1,5 @@
 {
-  "extends": "@fitness/tsconfig/base.json",
+  "extends": "@liftify/tsconfig/base.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
