@@ -157,9 +157,25 @@ function ChartCard({
 }) {
   return (
     <section className="rounded-card border border-border bg-card p-5">
-      <div className="flex items-center gap-1.5">
+      <div className="relative flex items-center gap-1.5">
         <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
-        {hint && <InfoHint text={hint} />}
+        {hint && (
+          <>
+            <button
+              type="button"
+              aria-label="What does this mean?"
+              className="peer flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Info className="size-4" />
+            </button>
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-full max-w-xs rounded-xl border border-border bg-card p-3 text-xs leading-relaxed text-foreground opacity-0 shadow-lg transition-opacity duration-150 peer-hover:opacity-100 peer-focus:opacity-100"
+            >
+              {hint}
+            </span>
+          </>
+        )}
       </div>
       <div className="mt-4 h-56">
         <ResponsiveContainer width="100%" height="100%">
@@ -167,25 +183,5 @@ function ChartCard({
         </ResponsiveContainer>
       </div>
     </section>
-  );
-}
-
-function InfoHint({ text }: { text: string }) {
-  return (
-    <span className="group relative inline-flex">
-      <button
-        type="button"
-        aria-label="What does this mean?"
-        className="flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <Info className="size-4" />
-      </button>
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute right-0 top-full z-20 mt-2 w-64 rounded-xl border border-border bg-card p-3 text-xs leading-relaxed text-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
-      >
-        {text}
-      </span>
-    </span>
   );
 }
