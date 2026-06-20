@@ -13,6 +13,7 @@ import {
   ChartLineUp,
   type Icon,
 } from "@phosphor-icons/react";
+import { NotificationBell } from "@/components/notification-bell";
 
 const NAV: { href: string; label: string; icon: Icon }[] = [
   { href: "/", label: "Home", icon: House },
@@ -29,12 +30,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const ensureUser = useMutation(api.users.getOrCreateCurrentUser);
+  const ensureWeekly = useMutation(api.notifications.ensureWeekly);
   const access = useQuery(api.users.accessState);
 
-  // Create the user row (and start the trial) on first authenticated load.
+  // Create the user row (and start the trial) on first authenticated load,
+  // then make sure this week's reminder exists.
   useEffect(() => {
-    ensureUser().catch(() => {});
-  }, [ensureUser]);
+    ensureUser()
+      .then(() => ensureWeekly())
+      .catch(() => {});
+  }, [ensureUser, ensureWeekly]);
 
   // Gate: send lapsed users to the paywall.
   useEffect(() => {
@@ -82,7 +87,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <UserButton />
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <UserButton />
+          </div>
         </div>
       </header>
 

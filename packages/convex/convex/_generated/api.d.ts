@@ -9,8 +9,10 @@
  */
 
 import type * as bodyEntries from "../bodyEntries.js";
+import type * as crons from "../crons.js";
 import type * as exercises from "../exercises.js";
 import type * as model from "../model.js";
+import type * as notifications from "../notifications.js";
 import type * as users from "../users.js";
 import type * as workouts from "../workouts.js";
 
@@ -22,8 +24,10 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   bodyEntries: typeof bodyEntries;
+  crons: typeof crons;
   exercises: typeof exercises;
   model: typeof model;
+  notifications: typeof notifications;
   users: typeof users;
   workouts: typeof workouts;
 }>;

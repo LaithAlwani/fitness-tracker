@@ -73,4 +73,14 @@ export default defineSchema({
       }),
     ),
   }).index("by_user_date", ["userId", "date"]),
+
+  notifications: defineTable({
+    userId: v.id("users"),
+    type: v.string(), // e.g. "body_weight_reminder"
+    title: v.string(),
+    body: v.string(),
+    weekKey: v.optional(v.number()), // dedupe one-per-week reminders
+    createdAt: v.number(),
+    readAt: v.optional(v.number()),
+  }).index("by_user", ["userId"]),
 });
