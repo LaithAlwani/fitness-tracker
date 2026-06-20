@@ -62,6 +62,21 @@ export default function SettingsPage() {
           ? "Payment past due"
           : "No active plan";
 
+  const fmtDate = (ms: number) =>
+    new Date(ms).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  const renewMs = me?.currentPeriodEnd;
+  const cancelling = !!me?.cancelAtPeriodEnd;
+  const billingLine =
+    access?.status === "active" && renewMs
+      ? `${cancelling ? "Ends" : "Next billing"} ${fmtDate(renewMs)}`
+      : access?.status === "trialing" && access.trialEndsAt
+        ? `${me?.stripeSubscriptionId && renewMs ? `First charge ${fmtDate(renewMs)}` : `Trial ends ${fmtDate(access.trialEndsAt)}`}`
+        : null;
+
   return (
     <div className="container-page flex max-w-xl flex-col gap-6 py-8">
       <h1 className="text-3xl font-semibold tracking-tighter">Settings</h1>
@@ -114,6 +129,11 @@ export default function SettingsPage() {
         <div>
           <h2 className="font-medium">Membership</h2>
           <p className="mt-1 text-sm text-muted-foreground">{membership}</p>
+          {billingLine && (
+            <p className="mt-0.5 text-xs text-muted-foreground/70">
+              {billingLine}
+            </p>
+          )}
         </div>
         <CaretRight className="size-5 text-muted-foreground" />
       </Link>
