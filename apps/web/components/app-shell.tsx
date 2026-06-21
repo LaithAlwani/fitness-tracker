@@ -12,6 +12,7 @@ import {
   Scales,
   ChartLineUp,
   ClockCounterClockwise,
+  Gear,
   type Icon,
 } from "@phosphor-icons/react";
 import { NotificationBell } from "@/components/notification-bell";
@@ -137,18 +138,18 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
             Liftify
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <NotificationBell />
             <Link
               href="/settings"
-              aria-label="Account & settings"
-              className={`rounded-full transition-opacity hover:opacity-90 ${
+              aria-label="Settings"
+              className={`flex size-9 items-center justify-center rounded-full transition-colors hover:bg-muted ${
                 pathname.startsWith("/settings")
-                  ? "ring-2 ring-accent-strong"
-                  : ""
+                  ? "text-accent-strong"
+                  : "text-foreground"
               }`}
             >
-              {avatar}
+              <Gear className="size-5" />
             </Link>
           </div>
         </div>
