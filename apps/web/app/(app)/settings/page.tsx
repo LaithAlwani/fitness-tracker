@@ -11,6 +11,7 @@ import {
   TrashSimple,
   WarningCircle,
 } from "@phosphor-icons/react";
+import { PushToggle } from "@/components/push-toggle";
 
 const UNITS = ["lb", "kg"] as const;
 
@@ -178,6 +179,9 @@ export default function SettingsPage() {
           ))}
         </div>
       </section>
+
+      {/* Push reminders */}
+      <PushToggle />
 
       {/* Account */}
       <section className="rounded-card border border-border bg-card p-5">

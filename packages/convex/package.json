@@ -23,10 +23,12 @@
   "dependencies": {
     "@liftify/shared": "*",
     "convex": "^1.17.4",
-    "stripe": "^17.5.0"
+    "stripe": "^17.5.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@liftify/tsconfig": "*",
+    "@types/web-push": "^3.6.4",
     "typescript": "^5.7.2"
   }
 }

@@ -5,6 +5,7 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import { getCurrentUser, getCurrentUserOrThrow } from "./model";
 
 const DAY = 86_400_000;
@@ -18,13 +19,17 @@ function startOfWeek(ms: number): number {
 
 // Create this week's body-weight reminder unless it exists already, or the user
 // has already logged a body entry this week.
-async function ensureWeeklyFor(ctx: MutationCtx, user: Doc<"users">) {
+// Returns true if a reminder notification was created (so the caller can push).
+async function ensureWeeklyFor(
+  ctx: MutationCtx,
+  user: Doc<"users">,
+): Promise<boolean> {
   const now = Date.now();
   const weekKey = startOfWeek(now);
 
   // One reminder per week, tracked on the user so it never regenerates after
   // being read/cleared this week (and isn't recreated if they delete it).
-  if (user.lastWeighInWeek === weekKey) return;
+  if (user.lastWeighInWeek === weekKey) return false;
 
   const latestEntry = await ctx.db
     .query("bodyEntries")
@@ -34,7 +39,7 @@ async function ensureWeeklyFor(ctx: MutationCtx, user: Doc<"users">) {
   if (latestEntry && latestEntry.date >= weekKey) {
     // already weighed in — mark handled, no reminder needed
     await ctx.db.patch(user._id, { lastWeighInWeek: weekKey });
-    return;
+    return false;
   }
 
   await ctx.db.insert("notifications", {
@@ -46,6 +51,7 @@ async function ensureWeeklyFor(ctx: MutationCtx, user: Doc<"users">) {
     createdAt: now,
   });
   await ctx.db.patch(user._id, { lastWeighInWeek: weekKey });
+  return true;
 }
 
 export const ensureWeekly = mutation({
@@ -108,6 +114,16 @@ export const ensureWeeklyForAll = internalMutation({
   args: {},
   handler: async (ctx) => {
     const users = await ctx.db.query("users").collect();
-    for (const u of users) await ensureWeeklyFor(ctx, u);
+    for (const u of users) {
+      const created = await ensureWeeklyFor(ctx, u);
+      if (created) {
+        await ctx.scheduler.runAfter(0, internal.pushSender.sendPush, {
+          userId: u._id,
+          title: "Weekly weigh-in",
+          body: "Log your body weight to keep your progress up to date.",
+          url: "/body",
+        });
+      }
+    }
   },
 });
