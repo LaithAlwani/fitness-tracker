@@ -88,16 +88,15 @@ export default function SettingsPage() {
         ? "$9.99"
         : null;
   const amountSuffix = planAmount ? ` · ${planAmount}` : "";
+  const hasPaidSub = !!me?.stripeSubscriptionId;
   const billingLine =
-    access?.status === "active" && renewMs
-      ? cancelling
-        ? `Ends ${fmtDate(renewMs)}`
-        : `Next charge ${fmtDate(renewMs)}${amountSuffix}`
-      : access?.status === "trialing" && access.trialEndsAt
-        ? me?.stripeSubscriptionId && renewMs
-          ? `First charge ${fmtDate(renewMs)}${amountSuffix}`
-          : `Trial ends ${fmtDate(access.trialEndsAt)}`
-        : null;
+    cancelling && renewMs
+      ? `Ends ${fmtDate(renewMs)}`
+      : hasPaidSub && renewMs
+        ? `Next payment ${fmtDate(renewMs)}${amountSuffix}`
+        : !hasPaidSub && access?.status === "trialing" && access.trialEndsAt
+          ? `Trial ends ${fmtDate(access.trialEndsAt)}`
+          : null;
 
   return (
     <div className="container-page flex max-w-xl flex-col gap-6 py-8">
