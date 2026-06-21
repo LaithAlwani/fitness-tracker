@@ -62,6 +62,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       >
         <body className="min-h-full flex flex-col">
+          {/* Apply the saved text size before paint to avoid a flash. */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html:
+                "(function(){try{var s=localStorage.getItem('liftify:font-size');var m={sm:'14px',base:'16px',lg:'18px'};if(s&&m[s]){document.documentElement.style.fontSize=m[s];}}catch(e){}})();",
+            }}
+          />
           <Providers>{children}</Providers>
           <RegisterSW />
         </body>

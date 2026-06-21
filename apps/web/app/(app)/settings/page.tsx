@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUser, useClerk, SignOutButton } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
@@ -14,6 +14,13 @@ import {
 
 const UNITS = ["lb", "kg"] as const;
 
+type FontSize = "sm" | "base" | "lg";
+const FONT_SIZES: { key: FontSize; label: string; px: string }[] = [
+  { key: "sm", label: "Small", px: "14px" },
+  { key: "base", label: "Regular", px: "16px" },
+  { key: "lg", label: "Large", px: "18px" },
+];
+
 export default function SettingsPage() {
   const me = useQuery(api.users.me, {});
   const access = useQuery(api.users.accessState, {});
@@ -25,6 +32,26 @@ export default function SettingsPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [fontSize, setFontSize] = useState<FontSize>("base");
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem("liftify:font-size");
+      if (s === "sm" || s === "base" || s === "lg") setFontSize(s);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  function applyFontSize(key: FontSize) {
+    setFontSize(key);
+    const px = FONT_SIZES.find((f) => f.key === key)?.px ?? "16px";
+    try {
+      localStorage.setItem("liftify:font-size", key);
+    } catch {
+      /* ignore */
+    }
+    document.documentElement.style.fontSize = px;
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -124,6 +151,29 @@ export default function SettingsPage() {
               }`}
             >
               {u}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Text size */}
+      <section className="rounded-card border border-border bg-card p-5">
+        <h2 className="font-medium">Text size</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Adjust how large text appears across the app.
+        </p>
+        <div className="mt-4 inline-flex rounded-full border border-border p-1">
+          {FONT_SIZES.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => applyFontSize(f.key)}
+              className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${
+                fontSize === f.key
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {f.label}
             </button>
           ))}
         </div>
