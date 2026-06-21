@@ -243,9 +243,9 @@ export default function BodyPage() {
                 <Line
                   type="monotone"
                   dataKey="weight"
-                  stroke="#84cc16"
+                  stroke="#8b5cf6"
                   strokeWidth={2.5}
-                  dot={{ r: 3, fill: "#84cc16" }}
+                  dot={{ r: 3, fill: "#8b5cf6" }}
                 />
               </LineChart>
             </ResponsiveContainer>

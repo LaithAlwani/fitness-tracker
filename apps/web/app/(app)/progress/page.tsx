@@ -103,7 +103,7 @@ export default function ProgressPage() {
                 width={32}
               />
               <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--muted)" }} />
-              <Bar dataKey="count" fill="#84cc16" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="count" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ChartCard>
 
@@ -123,9 +123,9 @@ export default function ProgressPage() {
               <Line
                 type="monotone"
                 dataKey="volume"
-                stroke="#84cc16"
+                stroke="#8b5cf6"
                 strokeWidth={2.5}
-                dot={{ r: 3, fill: "#84cc16" }}
+                dot={{ r: 3, fill: "#8b5cf6" }}
               />
             </LineChart>
           </ChartCard>

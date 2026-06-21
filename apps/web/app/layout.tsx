@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#a3e635",
+  themeColor: "#0a0a0f",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -46,7 +46,16 @@ export default function RootLayout({
       signUpUrl="/sign-up"
       signInFallbackRedirectUrl="/"
       signUpFallbackRedirectUrl="/"
-      appearance={{ variables: { colorPrimary: "#65a30d" } }}
+      appearance={{
+        variables: {
+          colorPrimary: "#8b5cf6",
+          colorBackground: "#16161f",
+          colorText: "#fafafa",
+          colorInputBackground: "#0a0a0f",
+          colorInputText: "#fafafa",
+          colorNeutral: "#fafafa",
+        },
+      }}
     >
       <html
         lang="en"

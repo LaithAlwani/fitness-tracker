@@ -1,44 +1,29 @@
 @import "tailwindcss";
 
 /* =====================================================================
-   Liftify shared design tokens  (mirror of the marketing repo's app/globals.css)
-   Athletic-minimal: zinc/ink neutrals + one volt-lime brand accent.
-   Keep this :root + @theme + .container-page block identical in both
-   repos so colors and margins match on marketing and app.
+   Liftify shared design tokens  (mirror of the marketing repo's globals.css)
+   Dark, premium performance look: ink + violet accent. Dark by default.
+   Keep this :root + @theme + .container-page block identical in both repos.
    ===================================================================== */
 
 :root {
-  /* Neutrals (zinc-based ink) */
-  --background: #ffffff;
-  --foreground: #18181b;        /* zinc-900 */
-  --muted: #f4f4f5;             /* zinc-100 — subtle surfaces */
-  --muted-foreground: #71717a;  /* zinc-500 — secondary text */
-  --card: #ffffff;
-  --border: #e4e4e7;            /* zinc-200 */
-  --ring: #a3e635;
+  color-scheme: dark;
 
-  /* Brand — CoreVex Volt */
-  --accent: #a3e635;            /* volt lime — CTAs, energy, progress */
-  --accent-foreground: #0a0a0a; /* near-black text on volt */
-  --accent-strong: #84cc16;     /* hover / pressed */
+  --background: #0a0a0f;        /* ink */
+  --foreground: #fafafa;        /* near-white */
+  --muted: #1c1c26;            /* chips / subtle surfaces */
+  --muted-foreground: #a1a1aa; /* secondary text */
+  --card: #16161f;             /* cards / panels */
+  --border: #262630;           /* hairlines */
+  --ring: #8b5cf6;
+
+  /* Brand — Liftify Violet */
+  --accent: #8b5cf6;            /* violet — CTAs, energy, progress */
+  --accent-foreground: #ffffff; /* white text on violet */
+  --accent-strong: #a78bfa;     /* accent text / hover */
 
   /* Shape */
   --radius: 0.875rem;           /* 14px — cards */
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #fafafa;       /* zinc-50 */
-    --muted: #18181b;            /* zinc-900 */
-    --muted-foreground: #a1a1aa; /* zinc-400 */
-    --card: #111113;
-    --border: #27272a;           /* zinc-800 */
-    --ring: #a3e635;
-    --accent: #bef264;           /* brighter volt on dark */
-    --accent-foreground: #0a0a0a;
-    --accent-strong: #a3e635;
-  }
 }
 
 @theme inline {

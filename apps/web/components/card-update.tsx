@@ -55,7 +55,7 @@ export function CardUpdate({ onClose }: { onClose: () => void }) {
         clientSecret,
         appearance: {
           theme: dark ? "night" : "stripe",
-          variables: { colorPrimary: "#84cc16" },
+          variables: { colorPrimary: "#8b5cf6" },
         },
       }}
     >
