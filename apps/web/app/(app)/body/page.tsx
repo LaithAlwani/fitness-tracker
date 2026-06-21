@@ -21,6 +21,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { StatCard } from "@/components/ui/stat-card";
 
 const MEAS_KEYS = ["waist", "chest", "arms", "hips", "thighs"] as const;
 type MeasKey = (typeof MEAS_KEYS)[number];
@@ -66,6 +67,12 @@ export default function BodyPage() {
   const asc = entries ? [...entries].reverse() : [];
   const chartData = asc.map((e) => ({ label: shortDate(e.date), weight: e.weight }));
   const latest = entries?.[0];
+  const prev = entries?.[1];
+  const weightDelta =
+    latest && prev ? Math.round((latest.weight - prev.weight) * 10) / 10 : null;
+  const latestMeas = entries?.find(
+    (e) => e.measurements && Object.values(e.measurements).some((v) => v != null),
+  )?.measurements;
 
   async function add() {
     setError(null);
@@ -205,11 +212,23 @@ export default function BodyPage() {
         <div className="flex items-baseline justify-between">
           <h2 className="text-sm font-medium text-muted-foreground">Weight</h2>
           {latest && (
-            <p className="text-2xl font-semibold tracking-tight tabular-nums">
-              {latest.weight}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">
-                {unit}
+            <p className="flex items-baseline gap-2 text-2xl font-semibold tracking-tight tabular-nums">
+              <span>
+                {latest.weight}
+                <span className="ml-1 text-sm font-normal text-muted-foreground">
+                  {unit}
+                </span>
               </span>
+              {weightDelta !== null && weightDelta !== 0 && (
+                <span
+                  className={`text-sm font-medium ${
+                    weightDelta < 0 ? "text-accent-strong" : "text-muted-foreground"
+                  }`}
+                >
+                  {weightDelta > 0 ? "+" : ""}
+                  {weightDelta}
+                </span>
+              )}
             </p>
           )}
         </div>
@@ -256,6 +275,25 @@ export default function BodyPage() {
           </p>
         )}
       </section>
+
+      {/* Latest measurements */}
+      {latestMeas && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Latest measurements
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {MEAS_KEYS.filter((k) => latestMeas[k] != null).map((k) => (
+              <StatCard
+                key={k}
+                label={k[0].toUpperCase() + k.slice(1)}
+                value={String(latestMeas[k])}
+                sublabel="inches"
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* History */}
       {entries && entries.length > 0 && (

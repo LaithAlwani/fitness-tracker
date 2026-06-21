@@ -12,7 +12,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Info } from "@phosphor-icons/react";
+import { Info, Barbell, Flame, CalendarCheck, Target } from "@phosphor-icons/react";
+import { StatCard } from "@/components/ui/stat-card";
+import { Heatmap } from "@/components/ui/heatmap";
+import { computeStreak } from "@/lib/streak";
 
 const DAY = 86_400_000;
 
@@ -21,6 +24,11 @@ function startOfWeek(ms: number) {
   const dayFromMonday = (d.getDay() + 6) % 7;
   d.setHours(0, 0, 0, 0);
   return d.getTime() - dayFromMonday * DAY;
+}
+function startOfDay(ms: number) {
+  const d = new Date(ms);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
 }
 function weekLabel(ms: number) {
   return new Date(ms).toLocaleDateString(undefined, {
@@ -71,6 +79,19 @@ export default function ProgressPage() {
 
   const total = workouts?.length ?? 0;
   const hasData = total > 0;
+  const streak = workouts ? computeStreak(workouts.map((w) => w.date)) : 0;
+  const thisWeekStart = startOfWeek(Date.now());
+  const thisWeekCount = (workouts ?? []).filter(
+    (w) => w.date >= thisWeekStart,
+  ).length;
+  const avgPerWeek = (
+    weeks.reduce((s, w) => s + w.count, 0) / WEEKS
+  ).toFixed(1);
+  const dayValues = new Map<number, number>();
+  for (const w of workouts ?? []) {
+    const k = startOfDay(w.date);
+    dayValues.set(k, (dayValues.get(k) ?? 0) + 1);
+  }
 
   return (
     <div className="container-page flex flex-col gap-6 py-8">
@@ -84,11 +105,28 @@ export default function ProgressPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <Stat label="Total workouts" value={String(total)} />
-            <Stat
-              label="Avg / week (8 wk)"
-              value={(weeks.reduce((s, w) => s + w.count, 0) / WEEKS).toFixed(1)}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard
+              label="Total workouts"
+              value={String(total)}
+              icon={<Barbell weight="bold" className="size-4" />}
+            />
+            <StatCard
+              label="This week"
+              value={String(thisWeekCount)}
+              icon={<CalendarCheck weight="bold" className="size-4" />}
+            />
+            <StatCard
+              label="Streak"
+              value={String(streak)}
+              sublabel={streak === 1 ? "day" : "days"}
+              icon={<Flame weight="fill" className="size-4" />}
+            />
+            <StatCard
+              label="Avg / week"
+              value={avgPerWeek}
+              sublabel="last 8 wk"
+              icon={<Target weight="bold" className="size-4" />}
             />
           </div>
 
@@ -129,19 +167,20 @@ export default function ProgressPage() {
               />
             </LineChart>
           </ChartCard>
+
+          <section className="rounded-card border border-border bg-card p-5">
+            <h2 className="text-sm font-medium text-muted-foreground">
+              Consistency
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Each square is a day you trained
+            </p>
+            <div className="mt-4">
+              <Heatmap values={dayValues} />
+            </div>
+          </section>
         </>
       )}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-card border border-border bg-card p-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
-        {value}
-      </p>
     </div>
   );
 }
