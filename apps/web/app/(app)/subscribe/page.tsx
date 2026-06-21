@@ -174,8 +174,7 @@ export default function SubscribePage() {
           founder?.available &&
           spotsLeft !== null && (
             <p className="mt-2 text-xs font-medium text-accent-strong">
-              Only {spotsLeft} founder {spotsLeft === 1 ? "spot" : "spots"} left
-              of {founder.target}.
+              Only {spotsLeft} founder {spotsLeft === 1 ? "spot" : "spots"} left.
             </p>
           )}
 
