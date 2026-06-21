@@ -371,14 +371,18 @@ function LogWorkout() {
 
   return (
     <div className="container-page flex flex-col gap-6 py-8">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           aria-label="Workout name"
-          className={`h-11 flex-1 text-lg font-semibold tracking-tight ${inputBase}`}
+          className={`h-11 w-full text-lg font-semibold tracking-tight sm:flex-1 ${inputBase}`}
         />
-        <Button onClick={requestFinish} disabled={saving || entries.length === 0}>
+        <Button
+          onClick={requestFinish}
+          disabled={saving || entries.length === 0}
+          className="w-full sm:w-auto"
+        >
           <Check weight="bold" className="size-4" />
           {isEditing ? "Save" : "Finish"}
         </Button>
