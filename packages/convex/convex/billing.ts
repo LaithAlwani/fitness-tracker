@@ -124,6 +124,53 @@ export const setCancelAtPeriodEnd = internalMutation({
   },
 });
 
+// Switch an existing subscription between monthly/yearly. Founders keep their
+// $29.99/yr on yearly; non-founders get it only if spots remain.
+export const changePlan = action({
+  args: { interval: v.union(v.literal("monthly"), v.literal("yearly")) },
+  handler: async (ctx, { interval }): Promise<void> => {
+    const user = await ctx.runQuery(api.users.me, {});
+    if (!user?.stripeSubscriptionId) {
+      throw new Error("No subscription to change.");
+    }
+    const fs = await ctx.runQuery(api.users.founderStatus, {});
+    const founder = interval === "yearly" && (!!user.isFounder || fs.available);
+    const priceId = priceFor(interval, founder);
+
+    const stripe = getStripe();
+    const sub = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+    const itemId = sub.items.data[0]?.id;
+    if (!itemId) throw new Error("Subscription item missing");
+
+    await stripe.subscriptions.update(user.stripeSubscriptionId, {
+      items: [{ id: itemId, price: priceId }],
+      proration_behavior: "create_prorations",
+      cancel_at_period_end: false,
+    });
+
+    await ctx.runMutation(internal.billing.setPlan, {
+      userId: user._id,
+      billingInterval: interval,
+      isFounder: founder ? true : undefined,
+    });
+  },
+});
+
+export const setPlan = internalMutation({
+  args: {
+    userId: v.id("users"),
+    billingInterval: v.union(v.literal("monthly"), v.literal("yearly")),
+    isFounder: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { userId, billingInterval, isFounder }) => {
+    await ctx.db.patch(userId, {
+      billingInterval,
+      cancelAtPeriodEnd: false,
+      ...(isFounder ? { isFounder: true } : {}),
+    });
+  },
+});
+
 // In-app card update: start a SetupIntent the client confirms with Stripe
 // Elements; then setDefaultPaymentMethod points future charges at the new card.
 export const createSetupIntent = action({

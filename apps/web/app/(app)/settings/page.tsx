@@ -80,11 +80,23 @@ export default function SettingsPage() {
     });
   const renewMs = me?.currentPeriodEnd;
   const cancelling = !!me?.cancelAtPeriodEnd;
+  const planAmount = me?.isFounder
+    ? "$29.99"
+    : me?.billingInterval === "yearly"
+      ? "$99.99"
+      : me?.billingInterval === "monthly"
+        ? "$9.99"
+        : null;
+  const amountSuffix = planAmount ? ` · ${planAmount}` : "";
   const billingLine =
     access?.status === "active" && renewMs
-      ? `${cancelling ? "Ends" : "Next billing"} ${fmtDate(renewMs)}`
+      ? cancelling
+        ? `Ends ${fmtDate(renewMs)}`
+        : `Next charge ${fmtDate(renewMs)}${amountSuffix}`
       : access?.status === "trialing" && access.trialEndsAt
-        ? `${me?.stripeSubscriptionId && renewMs ? `First charge ${fmtDate(renewMs)}` : `Trial ends ${fmtDate(access.trialEndsAt)}`}`
+        ? me?.stripeSubscriptionId && renewMs
+          ? `First charge ${fmtDate(renewMs)}${amountSuffix}`
+          : `Trial ends ${fmtDate(access.trialEndsAt)}`
         : null;
 
   return (

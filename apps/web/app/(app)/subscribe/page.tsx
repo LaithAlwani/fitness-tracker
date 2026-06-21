@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import { Check, WarningCircle, Crown } from "@phosphor-icons/react";
@@ -30,6 +30,7 @@ export default function SubscribePage() {
   const me = useQuery(api.users.me, {});
   const founder = useQuery(api.users.founderStatus, {});
   const checkout = useAction(api.billing.createCheckoutSession);
+  const changePlan = useAction(api.billing.changePlan);
   const cancelSub = useAction(api.billing.cancelSubscription);
   const resumeSub = useAction(api.billing.resumeSubscription);
 
@@ -50,17 +51,22 @@ export default function SubscribePage() {
       ? Math.max(0, Math.ceil((access.trialEndsAt - Date.now()) / 86_400_000))
       : null;
 
-  // Founder discount: yearly only, while spots remain.
-  const founderYearly = interval === "yearly" && (founder?.available ?? false);
-  const price =
-    interval === "monthly"
-      ? "$9.99"
-      : founderYearly
-        ? "$29.99"
-        : "$99.99";
-  const suffix = interval === "monthly" ? "/mo" : "/yr";
+  // Default the chooser to the user's current plan once it loads.
+  const synced = useRef(false);
+  useEffect(() => {
+    if (!synced.current && me?.billingInterval) {
+      setInterval(me.billingInterval);
+      synced.current = true;
+    }
+  }, [me?.billingInterval]);
 
-  // The user's actual plan (when subscribed).
+  // Founders keep $29.99/yr for life; others get it only while spots remain.
+  const founderEligible =
+    interval === "yearly" && (!!me?.isFounder || (founder?.available ?? false));
+  const price =
+    interval === "monthly" ? "$9.99" : founderEligible ? "$29.99" : "$99.99";
+  const suffix = interval === "monthly" ? "/mo" : "/yr";
+  const spotsLeft = founder ? Math.max(0, founder.target - founder.claimed) : null;
   const planName = me?.isFounder
     ? "Founder"
     : me?.billingInterval === "yearly"
@@ -68,14 +74,7 @@ export default function SubscribePage() {
       : me?.billingInterval === "monthly"
         ? "Monthly"
         : null;
-  const subPrice = me?.isFounder
-    ? "$29.99"
-    : me?.billingInterval === "yearly"
-      ? "$99.99"
-      : "$9.99";
-  const subSuffix = me?.billingInterval === "monthly" ? "/mo" : "/yr";
-  const showPrice = hasSubscription ? subPrice : price;
-  const showSuffix = hasSubscription ? subSuffix : suffix;
+  const isCurrentPlan = hasSubscription && me?.billingInterval === interval;
 
   async function startCheckout() {
     setBusy(true);
@@ -109,7 +108,7 @@ export default function SubscribePage() {
     status === "trialing"
       ? `You're on the free trial — ${trialDaysLeft} ${trialDaysLeft === 1 ? "day" : "days"} left.`
       : status === "active"
-        ? "Your membership is active. Thanks for lifting with us."
+        ? `You're on the ${planName ?? "active"} plan.`
         : status === "past_due"
           ? "There was a problem with your last payment."
           : "Start your 30-day free trial to unlock Liftify.";
@@ -124,66 +123,61 @@ export default function SubscribePage() {
       </div>
 
       <div className="w-full max-w-md rounded-card border-2 border-accent-strong bg-card p-8 shadow-xl shadow-accent/10">
-        {!hasSubscription && (
-          <>
-            {/* Interval toggle */}
-            <div className="mb-6 inline-flex rounded-full border border-border p-1">
-              {(["monthly", "yearly"] as const).map((iv) => (
-                <button
-                  key={iv}
-                  onClick={() => setInterval(iv)}
-                  className={`rounded-full px-5 py-1.5 text-sm font-medium capitalize transition-colors ${
-                    interval === iv
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {iv}
-                </button>
-              ))}
-            </div>
+        {/* Interval chooser (also used to switch plans when subscribed) */}
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div className="inline-flex rounded-full border border-border p-1">
+            {(["monthly", "yearly"] as const).map((iv) => (
+              <button
+                key={iv}
+                onClick={() => setInterval(iv)}
+                className={`rounded-full px-5 py-1.5 text-sm font-medium capitalize transition-colors ${
+                  interval === iv
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {iv}
+              </button>
+            ))}
+          </div>
+          {hasSubscription && isCurrentPlan && (
+            <span className="text-xs font-medium text-muted-foreground">
+              Current plan
+            </span>
+          )}
+        </div>
 
-            {founderYearly && (
-              <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold text-accent-strong">
-                <Crown weight="fill" className="size-3.5" />
-                Founder price — locked in for life
-              </div>
-            )}
-          </>
-        )}
-
-        {hasSubscription && (
-          <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-semibold">
-            {planName === "Founder" && (
-              <Crown weight="fill" className="size-3.5 text-accent-strong" />
-            )}
-            {status === "trialing"
-              ? planName
-                ? `Trial · ${planName} plan`
-                : "Trial"
-              : `${planName ?? "Membership"} plan`}
+        {founderEligible && (
+          <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold text-accent-strong">
+            <Crown weight="fill" className="size-3.5" />
+            Founder price — locked in for life
           </div>
         )}
 
         <p className="flex items-baseline gap-2">
-          <span className="text-5xl font-semibold tracking-tighter">
-            {showPrice}
-          </span>
-          <span className="text-muted-foreground">{showSuffix}</span>
-          {!hasSubscription && founderYearly && (
+          <span className="text-5xl font-semibold tracking-tighter">{price}</span>
+          <span className="text-muted-foreground">{suffix}</span>
+          {founderEligible && (
             <span className="text-lg text-muted-foreground line-through">
               $99.99
             </span>
           )}
         </p>
-        {!hasSubscription && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            {interval === "yearly"
-              ? "Billed yearly — 2 months free."
-              : "Billed monthly."}{" "}
-            Free for your first 30 days.
-          </p>
-        )}
+        <p className="mt-1 text-sm text-muted-foreground">
+          {interval === "yearly" ? "Billed yearly — 2 months free." : "Billed monthly."}
+          {!hasSubscription && " 30-day free trial."}
+        </p>
+
+        {/* Founder spots — shown when the offer is claimable */}
+        {interval === "yearly" &&
+          !me?.isFounder &&
+          founder?.available &&
+          spotsLeft !== null && (
+            <p className="mt-2 text-xs font-medium text-accent-strong">
+              Only {spotsLeft} founder {spotsLeft === 1 ? "spot" : "spots"} left
+              of {founder.target}.
+            </p>
+          )}
 
         <ul className="mt-6 flex flex-col gap-3 text-sm">
           {FEATURES.map((f) => (
@@ -197,12 +191,45 @@ export default function SubscribePage() {
           ))}
         </ul>
 
-        {hasSubscription ? (
-          <div className="mt-8 flex flex-col gap-3">
+        {/* Primary action */}
+        {!hasSubscription ? (
+          <button
+            onClick={startCheckout}
+            disabled={busy}
+            className={buttonClass("primary", "lg", "mt-8 w-full")}
+          >
+            {busy
+              ? "Starting…"
+              : status === "trialing"
+                ? "Subscribe now"
+                : "Start free trial"}
+          </button>
+        ) : isCurrentPlan ? (
+          <button
+            disabled
+            className={buttonClass("secondary", "lg", "mt-8 w-full")}
+          >
+            Your current plan
+          </button>
+        ) : (
+          <button
+            onClick={() => runManage(() => changePlan({ interval }))}
+            disabled={busy}
+            className={buttonClass("primary", "lg", "mt-8 w-full")}
+          >
+            {busy
+              ? "Switching…"
+              : `Switch to ${interval} · ${price}${suffix}`}
+          </button>
+        )}
+
+        {/* Management */}
+        {hasSubscription && (
+          <div className="mt-3 flex flex-col gap-3">
             <div className="rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm">
               {cancelling ? (
                 <span>
-                  Your membership ends on{" "}
+                  {planName ? `${planName} · ` : ""}Ends on{" "}
                   <span className="font-medium text-foreground">
                     {renewMs ? fmtDate(renewMs) : "the period end"}
                   </span>
@@ -210,7 +237,7 @@ export default function SubscribePage() {
                 </span>
               ) : status === "trialing" ? (
                 <span>
-                  Free trial — first charge on{" "}
+                  {planName ? `${planName} · ` : ""}Free trial — first charge on{" "}
                   <span className="font-medium text-foreground">
                     {renewMs ? fmtDate(renewMs) : "trial end"}
                   </span>
@@ -231,7 +258,7 @@ export default function SubscribePage() {
               <button
                 onClick={() => runManage(() => resumeSub({}))}
                 disabled={busy}
-                className={buttonClass("primary", "lg", "w-full")}
+                className={buttonClass("secondary", "md", "w-full")}
               >
                 {busy ? "Working…" : "Resume membership"}
               </button>
@@ -239,7 +266,7 @@ export default function SubscribePage() {
               <button
                 onClick={() => setConfirmCancel(true)}
                 disabled={busy}
-                className={buttonClass("secondary", "lg", "w-full")}
+                className={buttonClass("ghost", "md", "w-full")}
               >
                 Cancel membership
               </button>
@@ -257,18 +284,6 @@ export default function SubscribePage() {
               </div>
             )}
           </div>
-        ) : (
-          <button
-            onClick={startCheckout}
-            disabled={busy}
-            className={buttonClass("primary", "lg", "mt-8 w-full")}
-          >
-            {busy
-              ? "Starting…"
-              : status === "trialing"
-                ? "Subscribe now"
-                : "Start free trial"}
-          </button>
         )}
 
         {error && <p className="mt-3 text-center text-sm text-red-600">{error}</p>}
