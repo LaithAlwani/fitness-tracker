@@ -60,6 +60,23 @@ export default function SubscribePage() {
         : "$99.99";
   const suffix = interval === "monthly" ? "/mo" : "/yr";
 
+  // The user's actual plan (when subscribed).
+  const planName = me?.isFounder
+    ? "Founder"
+    : me?.billingInterval === "yearly"
+      ? "Yearly"
+      : me?.billingInterval === "monthly"
+        ? "Monthly"
+        : null;
+  const subPrice = me?.isFounder
+    ? "$29.99"
+    : me?.billingInterval === "yearly"
+      ? "$99.99"
+      : "$9.99";
+  const subSuffix = me?.billingInterval === "monthly" ? "/mo" : "/yr";
+  const showPrice = hasSubscription ? subPrice : price;
+  const showSuffix = hasSubscription ? subSuffix : suffix;
+
   async function startCheckout() {
     setBusy(true);
     setError(null);
@@ -135,19 +152,38 @@ export default function SubscribePage() {
           </>
         )}
 
+        {hasSubscription && (
+          <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-semibold">
+            {planName === "Founder" && (
+              <Crown weight="fill" className="size-3.5 text-accent-strong" />
+            )}
+            {status === "trialing"
+              ? planName
+                ? `Trial · ${planName} plan`
+                : "Trial"
+              : `${planName ?? "Membership"} plan`}
+          </div>
+        )}
+
         <p className="flex items-baseline gap-2">
-          <span className="text-5xl font-semibold tracking-tighter">{price}</span>
-          <span className="text-muted-foreground">{suffix}</span>
-          {founderYearly && (
+          <span className="text-5xl font-semibold tracking-tighter">
+            {showPrice}
+          </span>
+          <span className="text-muted-foreground">{showSuffix}</span>
+          {!hasSubscription && founderYearly && (
             <span className="text-lg text-muted-foreground line-through">
               $99.99
             </span>
           )}
         </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {interval === "yearly" ? "Billed yearly — 2 months free." : "Billed monthly."}
-          {" "}Free for your first 30 days.
-        </p>
+        {!hasSubscription && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {interval === "yearly"
+              ? "Billed yearly — 2 months free."
+              : "Billed monthly."}{" "}
+            Free for your first 30 days.
+          </p>
+        )}
 
         <ul className="mt-6 flex flex-col gap-3 text-sm">
           {FEATURES.map((f) => (
@@ -182,7 +218,7 @@ export default function SubscribePage() {
                 </span>
               ) : (
                 <span>
-                  {me?.isFounder ? "Founder plan · " : ""}Renews on{" "}
+                  {planName ? `${planName} · ` : ""}Renews on{" "}
                   <span className="font-medium text-foreground">
                     {renewMs ? fmtDate(renewMs) : "the next period"}
                   </span>

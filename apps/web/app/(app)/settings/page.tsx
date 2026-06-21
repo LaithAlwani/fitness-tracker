@@ -53,11 +53,21 @@ export default function SettingsPage() {
     access?.status === "trialing" && access.trialEndsAt
       ? Math.max(0, Math.ceil((access.trialEndsAt - Date.now()) / 86_400_000))
       : null;
+  const planLabel = me?.isFounder
+    ? "Founder · $29.99/yr"
+    : me?.billingInterval === "yearly"
+      ? "Yearly · $99.99/yr"
+      : me?.billingInterval === "monthly"
+        ? "Monthly · $9.99/mo"
+        : null;
+
   const membership =
     access?.status === "trialing"
-      ? `Free trial — ${trialDaysLeft} ${trialDaysLeft === 1 ? "day" : "days"} left`
+      ? `Free trial — ${trialDaysLeft} ${trialDaysLeft === 1 ? "day" : "days"} left${planLabel ? ` · ${planLabel}` : ""}`
       : access?.status === "active"
-        ? "Active — $7.99/mo"
+        ? planLabel
+          ? `Active · ${planLabel}`
+          : "Active"
         : access?.status === "past_due"
           ? "Payment past due"
           : "No active plan";
