@@ -22,24 +22,20 @@ async function ensureWeeklyFor(ctx: MutationCtx, user: Doc<"users">) {
   const now = Date.now();
   const weekKey = startOfWeek(now);
 
-  const mine = await ctx.db
-    .query("notifications")
-    .withIndex("by_user", (q) => q.eq("userId", user._id))
-    .collect();
-  if (
-    mine.some(
-      (n) => n.type === "body_weight_reminder" && n.weekKey === weekKey,
-    )
-  ) {
-    return;
-  }
+  // One reminder per week, tracked on the user so it never regenerates after
+  // being read/cleared this week (and isn't recreated if they delete it).
+  if (user.lastWeighInWeek === weekKey) return;
 
   const latestEntry = await ctx.db
     .query("bodyEntries")
     .withIndex("by_user_date", (q) => q.eq("userId", user._id))
     .order("desc")
     .first();
-  if (latestEntry && latestEntry.date >= weekKey) return; // already weighed in
+  if (latestEntry && latestEntry.date >= weekKey) {
+    // already weighed in — mark handled, no reminder needed
+    await ctx.db.patch(user._id, { lastWeighInWeek: weekKey });
+    return;
+  }
 
   await ctx.db.insert("notifications", {
     userId: user._id,
@@ -49,6 +45,7 @@ async function ensureWeeklyFor(ctx: MutationCtx, user: Doc<"users">) {
     weekKey,
     createdAt: now,
   });
+  await ctx.db.patch(user._id, { lastWeighInWeek: weekKey });
 }
 
 export const ensureWeekly = mutation({
@@ -95,7 +92,13 @@ export const markAllRead = mutation({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
     for (const n of items) {
-      if (n.readAt === undefined) await ctx.db.patch(n._id, { readAt: now });
+      if (n.readAt !== undefined) {
+        // Already read in a previous session — clear it for good.
+        await ctx.db.delete(n._id);
+      } else {
+        // Mark currently-shown ones read (badge clears now; they clear next open).
+        await ctx.db.patch(n._id, { readAt: now });
+      }
     }
   },
 });

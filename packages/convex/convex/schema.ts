@@ -35,6 +35,7 @@ export default defineSchema({
     billingInterval: v.optional(
       v.union(v.literal("monthly"), v.literal("yearly")),
     ),
+    lastWeighInWeek: v.optional(v.number()), // weekKey we last handled the weigh-in reminder
 
     createdAt: v.number(),
   })
