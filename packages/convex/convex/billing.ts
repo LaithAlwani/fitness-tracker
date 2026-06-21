@@ -12,19 +12,38 @@ function getStripe(): Stripe {
   return new Stripe(key, { httpClient: Stripe.createFetchHttpClient() });
 }
 
+// Picks the Stripe price. Founder discount applies to YEARLY only, and only
+// while spots remain. Monthly is always the regular price.
+function priceFor(interval: "monthly" | "yearly", founder: boolean): string {
+  let id: string | undefined;
+  if (interval === "yearly") {
+    id = founder
+      ? process.env.STRIPE_PRICE_FOUNDER_YEARLY
+      : process.env.STRIPE_PRICE_YEARLY;
+  } else {
+    id = process.env.STRIPE_PRICE_MONTHLY;
+  }
+  if (!id) throw new Error("Billing is not configured yet.");
+  return id;
+}
+
 // Start (or continue) a subscription. If the user still has trial days left,
 // the Stripe subscription's trial_end is set to match — no charge until then.
 export const createCheckoutSession = action({
-  args: { appUrl: v.string() },
-  handler: async (ctx, { appUrl }): Promise<{ url: string }> => {
+  args: {
+    appUrl: v.string(),
+    interval: v.union(v.literal("monthly"), v.literal("yearly")),
+  },
+  handler: async (ctx, { appUrl, interval }): Promise<{ url: string }> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    const priceId = process.env.STRIPE_PRICE_ID;
-    if (!priceId) throw new Error("Billing is not configured yet.");
-
     const user = await ctx.runQuery(api.users.me, {});
     if (!user) throw new Error("User not found");
+
+    const fs = await ctx.runQuery(api.users.founderStatus, {});
+    const founder = interval === "yearly" && fs.available;
+    const priceId = priceFor(interval, founder);
 
     const stripe = getStripe();
 
@@ -52,7 +71,7 @@ export const createCheckoutSession = action({
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
       subscription_data: {
-        metadata: { clerkId: identity.subject },
+        metadata: { clerkId: identity.subject, interval },
         ...(trialEnd ? { trial_end: trialEnd } : {}),
       },
       success_url: `${appUrl}/?checkout=success`,
@@ -170,6 +189,10 @@ export const applySubscription = internalMutation({
     currentPeriodEnd: v.optional(v.number()),
     trialEndsAt: v.optional(v.number()),
     cancelAtPeriodEnd: v.optional(v.boolean()),
+    isFounder: v.optional(v.boolean()),
+    billingInterval: v.optional(
+      v.union(v.literal("monthly"), v.literal("yearly")),
+    ),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db
@@ -188,6 +211,11 @@ export const applySubscription = internalMutation({
       ...(args.trialEndsAt !== undefined ? { trialEndsAt: args.trialEndsAt } : {}),
       ...(args.cancelAtPeriodEnd !== undefined
         ? { cancelAtPeriodEnd: args.cancelAtPeriodEnd }
+        : {}),
+      // Only ever SET founder true (claiming a spot) — never clear it.
+      ...(args.isFounder ? { isFounder: true } : {}),
+      ...(args.billingInterval
+        ? { billingInterval: args.billingInterval }
         : {}),
     });
   },

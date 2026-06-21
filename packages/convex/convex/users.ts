@@ -6,6 +6,7 @@ import {
   getCurrentUserOrThrow,
   hasAccess,
   TRIAL_MS,
+  FOUNDER_TARGET,
 } from "./model";
 
 // Called on first authenticated load. Creates the user row if missing and keeps
@@ -76,6 +77,24 @@ export const accessState = query({
       hasAccess: hasAccess(user, Date.now()),
       status: user.subscriptionStatus,
       trialEndsAt: user.trialEndsAt,
+    };
+  },
+});
+
+// Public: how many founder (yearly-lifetime) spots are claimed. Drives the
+// landing-page counter and gates whether new yearly subs get the founder price.
+export const founderStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const founders = await ctx.db
+      .query("users")
+      .withIndex("by_founder", (q) => q.eq("isFounder", true))
+      .collect();
+    const claimed = Math.min(founders.length, FOUNDER_TARGET);
+    return {
+      claimed,
+      target: FOUNDER_TARGET,
+      available: founders.length < FOUNDER_TARGET,
     };
   },
 });

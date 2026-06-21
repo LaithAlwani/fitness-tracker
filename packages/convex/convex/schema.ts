@@ -31,11 +31,16 @@ export default defineSchema({
     stripeSubscriptionId: v.optional(v.string()),
     currentPeriodEnd: v.optional(v.number()),
     cancelAtPeriodEnd: v.optional(v.boolean()),
+    isFounder: v.optional(v.boolean()), // claimed a first-100 lifetime price
+    billingInterval: v.optional(
+      v.union(v.literal("monthly"), v.literal("yearly")),
+    ),
 
     createdAt: v.number(),
   })
     .index("by_clerk_id", ["clerkId"])
-    .index("by_stripe_customer", ["stripeCustomerId"]),
+    .index("by_stripe_customer", ["stripeCustomerId"])
+    .index("by_founder", ["isFounder"]),
 
   exercises: defineTable({
     name: v.string(),

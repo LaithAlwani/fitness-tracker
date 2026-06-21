@@ -5,6 +5,9 @@ import type { Doc } from "./_generated/dataModel";
 
 export const TRIAL_MS = 30 * 24 * 60 * 60 * 1000; // 30-day trial
 
+// Founder deal: first N members on the yearly plan keep $29.99/yr for life.
+export const FOUNDER_TARGET = 100;
+
 export async function getCurrentUser(
   ctx: QueryCtx | MutationCtx,
 ): Promise<Doc<"users"> | null> {

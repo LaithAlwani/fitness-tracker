@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
-import { Check, WarningCircle } from "@phosphor-icons/react";
+import { Check, WarningCircle, Crown } from "@phosphor-icons/react";
 import { buttonClass } from "@/components/ui/button";
 import { CardUpdate } from "@/components/card-update";
 
@@ -14,6 +14,8 @@ const FEATURES = [
   "Weekly volume & strength charts",
   "Body-weight & measurement trends",
 ];
+
+type Interval = "monthly" | "yearly";
 
 function fmtDate(ms: number) {
   return new Date(ms).toLocaleDateString(undefined, {
@@ -26,10 +28,12 @@ function fmtDate(ms: number) {
 export default function SubscribePage() {
   const access = useQuery(api.users.accessState, {});
   const me = useQuery(api.users.me, {});
+  const founder = useQuery(api.users.founderStatus, {});
   const checkout = useAction(api.billing.createCheckoutSession);
   const cancelSub = useAction(api.billing.cancelSubscription);
   const resumeSub = useAction(api.billing.resumeSubscription);
 
+  const [interval, setInterval] = useState<Interval>("yearly");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -46,11 +50,24 @@ export default function SubscribePage() {
       ? Math.max(0, Math.ceil((access.trialEndsAt - Date.now()) / 86_400_000))
       : null;
 
+  // Founder discount: yearly only, while spots remain.
+  const founderYearly = interval === "yearly" && (founder?.available ?? false);
+  const price =
+    interval === "monthly"
+      ? "$9.99"
+      : founderYearly
+        ? "$29.99"
+        : "$99.99";
+  const suffix = interval === "monthly" ? "/mo" : "/yr";
+
   async function startCheckout() {
     setBusy(true);
     setError(null);
     try {
-      const { url } = await checkout({ appUrl: window.location.origin });
+      const { url } = await checkout({
+        appUrl: window.location.origin,
+        interval,
+      });
       window.location.href = url;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -90,12 +107,46 @@ export default function SubscribePage() {
       </div>
 
       <div className="w-full max-w-md rounded-card border-2 border-accent-strong bg-card p-8 shadow-xl shadow-accent/10">
-        <p className="flex items-baseline gap-1">
-          <span className="text-5xl font-semibold tracking-tighter">$7.99</span>
-          <span className="text-muted-foreground">/ month</span>
+        {!hasSubscription && (
+          <>
+            {/* Interval toggle */}
+            <div className="mb-6 inline-flex rounded-full border border-border p-1">
+              {(["monthly", "yearly"] as const).map((iv) => (
+                <button
+                  key={iv}
+                  onClick={() => setInterval(iv)}
+                  className={`rounded-full px-5 py-1.5 text-sm font-medium capitalize transition-colors ${
+                    interval === iv
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {iv}
+                </button>
+              ))}
+            </div>
+
+            {founderYearly && (
+              <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold text-accent-strong">
+                <Crown weight="fill" className="size-3.5" />
+                Founder price — locked in for life
+              </div>
+            )}
+          </>
+        )}
+
+        <p className="flex items-baseline gap-2">
+          <span className="text-5xl font-semibold tracking-tighter">{price}</span>
+          <span className="text-muted-foreground">{suffix}</span>
+          {founderYearly && (
+            <span className="text-lg text-muted-foreground line-through">
+              $99.99
+            </span>
+          )}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Free for your first 30 days.
+          {interval === "yearly" ? "Billed yearly — 2 months free." : "Billed monthly."}
+          {" "}Free for your first 30 days.
         </p>
 
         <ul className="mt-6 flex flex-col gap-3 text-sm">
@@ -112,7 +163,6 @@ export default function SubscribePage() {
 
         {hasSubscription ? (
           <div className="mt-8 flex flex-col gap-3">
-            {/* Status line */}
             <div className="rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm">
               {cancelling ? (
                 <span>
@@ -132,7 +182,7 @@ export default function SubscribePage() {
                 </span>
               ) : (
                 <span>
-                  Renews on{" "}
+                  {me?.isFounder ? "Founder plan · " : ""}Renews on{" "}
                   <span className="font-medium text-foreground">
                     {renewMs ? fmtDate(renewMs) : "the next period"}
                   </span>
@@ -181,7 +231,7 @@ export default function SubscribePage() {
               ? "Starting…"
               : status === "trialing"
                 ? "Subscribe now"
-                : "Start membership"}
+                : "Start free trial"}
           </button>
         )}
 

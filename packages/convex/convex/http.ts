@@ -2,9 +2,26 @@ import { httpRouter } from "convex/server";
 import Stripe from "stripe";
 
 import { httpAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 const http = httpRouter();
+
+// Public founder-spots counter for the marketing landing (CORS-enabled).
+http.route({
+  path: "/founder",
+  method: "GET",
+  handler: httpAction(async (ctx) => {
+    const fs = await ctx.runQuery(api.users.founderStatus, {});
+    return new Response(JSON.stringify(fs), {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        "access-control-allow-origin": "*",
+        "cache-control": "public, max-age=15",
+      },
+    });
+  }),
+});
 
 function mapStatus(
   s: Stripe.Subscription.Status,
@@ -66,6 +83,19 @@ http.route({
           ? "canceled"
           : mapStatus(sub.status);
 
+      const item = sub.items.data[0];
+      const priceId = item?.price?.id;
+      const founderYearly = process.env.STRIPE_PRICE_FOUNDER_YEARLY;
+      const isFounder =
+        priceId && founderYearly ? priceId === founderYearly : undefined;
+      const recInterval = item?.price?.recurring?.interval;
+      const billingInterval =
+        recInterval === "year"
+          ? ("yearly" as const)
+          : recInterval === "month"
+            ? ("monthly" as const)
+            : undefined;
+
       await ctx.runMutation(internal.billing.applySubscription, {
         stripeCustomerId: customerId,
         stripeSubscriptionId: sub.id,
@@ -75,6 +105,8 @@ http.route({
           : undefined,
         trialEndsAt: sub.trial_end ? sub.trial_end * 1000 : undefined,
         cancelAtPeriodEnd: sub.cancel_at_period_end,
+        isFounder,
+        billingInterval,
       });
     }
 
