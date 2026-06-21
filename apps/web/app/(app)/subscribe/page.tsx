@@ -67,10 +67,11 @@ export default function SubscribePage() {
     interval === "monthly" ? "$9.99" : founderEligible ? "$29.99" : "$99.99";
   const suffix = interval === "monthly" ? "/mo" : "/yr";
   const spotsLeft = founder ? Math.max(0, founder.target - founder.claimed) : null;
-  const planName = me?.isFounder
-    ? "Founder"
-    : me?.billingInterval === "yearly"
-      ? "Yearly"
+  const planName =
+    me?.billingInterval === "yearly"
+      ? me?.isFounder
+        ? "Founder"
+        : "Yearly"
       : me?.billingInterval === "monthly"
         ? "Monthly"
         : null;

@@ -53,10 +53,11 @@ export default function SettingsPage() {
     access?.status === "trialing" && access.trialEndsAt
       ? Math.max(0, Math.ceil((access.trialEndsAt - Date.now()) / 86_400_000))
       : null;
-  const planLabel = me?.isFounder
-    ? "Founder · $29.99/yr"
-    : me?.billingInterval === "yearly"
-      ? "Yearly · $99.99/yr"
+  const planLabel =
+    me?.billingInterval === "yearly"
+      ? me?.isFounder
+        ? "Founder · $29.99/yr"
+        : "Yearly · $99.99/yr"
       : me?.billingInterval === "monthly"
         ? "Monthly · $9.99/mo"
         : null;
@@ -80,10 +81,11 @@ export default function SettingsPage() {
     });
   const renewMs = me?.currentPeriodEnd;
   const cancelling = !!me?.cancelAtPeriodEnd;
-  const planAmount = me?.isFounder
-    ? "$29.99"
-    : me?.billingInterval === "yearly"
-      ? "$99.99"
+  const planAmount =
+    me?.billingInterval === "yearly"
+      ? me?.isFounder
+        ? "$29.99"
+        : "$99.99"
       : me?.billingInterval === "monthly"
         ? "$9.99"
         : null;
