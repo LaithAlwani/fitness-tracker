@@ -26,6 +26,6 @@ npm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# serwist / pwa generated
-/public/sw.js
+# Note: public/sw.js is a hand-written static service worker (committed),
+# not generated — so it is intentionally NOT ignored.
 /public/sw.js.map
