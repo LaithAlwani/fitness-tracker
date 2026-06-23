@@ -15,15 +15,19 @@ function urlBase64ToUint8Array(base64: string) {
 }
 
 export function PushToggle() {
-  const enabled = useQuery(api.push.pushEnabled, {});
+  const serverEnabled = useQuery(api.push.pushEnabled, {});
   const save = useMutation(api.push.savePushSubscription);
   const remove = useMutation(api.push.removePushSubscription);
+  const clearMine = useMutation(api.push.clearMine);
   const sendTest = useAction(api.push.sendTest);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [supported, setSupported] = useState(true);
+  const [permission, setPermission] = useState<NotificationPermission | null>(
+    null,
+  );
 
   useEffect(() => {
     setSupported(
@@ -32,7 +36,35 @@ export function PushToggle() {
         "PushManager" in window &&
         "Notification" in window,
     );
+    if (typeof Notification !== "undefined") setPermission(Notification.permission);
+    // Re-check when returning to the tab (permission may change in settings).
+    const onVis = () => {
+      if (typeof Notification !== "undefined") setPermission(Notification.permission);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
+
+  // If the OS/browser permission was revoked outside the app, the server may
+  // still hold a (now-dead) subscription. Reconcile so the UI tells the truth.
+  useEffect(() => {
+    if (serverEnabled && permission && permission !== "granted") {
+      (async () => {
+        try {
+          const reg = await navigator.serviceWorker.getRegistration();
+          const sub = await reg?.pushManager.getSubscription();
+          if (sub) await sub.unsubscribe();
+        } catch {
+          /* ignore */
+        }
+        clearMine({}).catch(() => {});
+      })();
+    }
+  }, [serverEnabled, permission, clearMine]);
+
+  // Only treat push as on when the server has a sub AND permission is granted.
+  const enabled = serverEnabled && permission === "granted";
+  const blocked = permission === "denied";
 
   const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
@@ -43,6 +75,7 @@ export function PushToggle() {
       if (!supported) throw new Error("Push isn't supported on this browser.");
       if (!vapid) throw new Error("Push isn't configured yet.");
       const perm = await Notification.requestPermission();
+      setPermission(perm);
       if (perm !== "granted") {
         throw new Error("Notification permission was not granted.");
       }
@@ -121,8 +154,22 @@ export function PushToggle() {
                 setError(null);
                 setNote(null);
                 try {
-                  await sendTest({});
-                  setNote("Test sent — check your notifications.");
+                  const res = await sendTest({});
+                  if (!res.configured) {
+                    setError(
+                      "Push isn't set up on the server yet (missing VAPID keys on Convex).",
+                    );
+                  } else if (res.subscriptions === 0) {
+                    setError("No subscribed device — turn push off and on again.");
+                  } else if (res.sent === 0) {
+                    setError(
+                      "Your subscription expired. Turn push off and on again.",
+                    );
+                  } else {
+                    setNote(
+                      `Test sent to ${res.sent} device${res.sent === 1 ? "" : "s"} — check your notifications.`,
+                    );
+                  }
                 } catch (e) {
                   setError(
                     e instanceof Error ? e.message : "Could not send test.",
@@ -146,6 +193,12 @@ export function PushToggle() {
         )}
       </div>
       {note && <p className="mt-2 text-sm text-accent-strong">{note}</p>}
+      {supported && blocked && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Notifications are blocked for Liftify. Re-allow them in your browser /
+          device settings, then enable push again.
+        </p>
+      )}
       {!supported && (
         <p className="mt-2 text-xs text-muted-foreground">
           Not supported here. On iPhone, install Liftify to your Home Screen

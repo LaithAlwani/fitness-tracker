@@ -1,7 +1,7 @@
 // Liftify service worker — enables install + fast loads.
 // Liftify is online-first (auth + Convex realtime), so this only caches the app
 // shell and immutable static assets. Everything else passes straight through.
-const CACHE = "liftify-v4";
+const CACHE = "liftify-v5";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -76,11 +76,12 @@ self.addEventListener("push", (event) => {
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((clients) => {
-        // If the app is open and on-screen, the in-app alert already covers it.
+        // If the app is open and on-screen, the in-app alert already covers it
+        // — unless this push asked to be forced (e.g. the "Send test" button).
         const focused = clients.some(
           (c) => c.focused || c.visibilityState === "visible",
         );
-        if (focused) return;
+        if (focused && !data.force) return;
         return self.registration.showNotification(title, {
           body: data.body || "",
           icon: "/icon-192.png",

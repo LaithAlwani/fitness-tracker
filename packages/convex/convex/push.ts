@@ -45,6 +45,21 @@ export const removePushSubscription = mutation({
   },
 });
 
+// Drop ALL of the current user's subscriptions — used when permission was
+// revoked outside the app, so the server state stops claiming push is on.
+export const clearMine = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) return;
+    const subs = await ctx.db
+      .query("pushSubscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    for (const s of subs) await ctx.db.delete(s._id);
+  },
+});
+
 // Whether the current user has at least one subscribed device.
 export const pushEnabled = query({
   args: {},
@@ -116,17 +131,26 @@ export const cancelScheduled = mutation({
   },
 });
 
-// Send a test push to the current user's devices.
+// Send a test push to the current user's devices and report the outcome.
+// `force: true` so it shows even though the app is in the foreground.
 export const sendTest = action({
   args: {},
-  handler: async (ctx): Promise<void> => {
+  handler: async (
+    ctx,
+  ): Promise<{
+    configured: boolean;
+    subscriptions: number;
+    sent: number;
+    dropped: number;
+  }> => {
     const user = await ctx.runQuery(api.users.me, {});
     if (!user) throw new Error("Not signed in");
-    await ctx.scheduler.runAfter(0, internal.pushSender.sendPush, {
+    return await ctx.runAction(internal.pushSender.sendPush, {
       userId: user._id,
       title: "Liftify",
       body: "Push notifications are working 🎉",
       url: "/",
+      force: true,
     });
   },
 });
