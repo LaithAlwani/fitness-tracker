@@ -6,8 +6,18 @@ import { api } from "@liftify/convex";
 import { BellRinging } from "@phosphor-icons/react";
 
 function urlBase64ToUint8Array(base64: string) {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const normalized = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  // Tolerate values that picked up quotes / whitespace / newlines in env config.
+  const clean = base64
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9_-]+$/.test(clean)) {
+    throw new Error(
+      "Push key looks invalid — check NEXT_PUBLIC_VAPID_PUBLIC_KEY (no quotes or spaces).",
+    );
+  }
+  const padding = "=".repeat((4 - (clean.length % 4)) % 4);
+  const normalized = (clean + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(normalized);
   const out = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
@@ -34,7 +44,10 @@ export function PushToggle() {
     );
   }, []);
 
-  const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim().replace(
+    /^["']|["']$/g,
+    "",
+  );
 
   async function enable() {
     setBusy(true);
