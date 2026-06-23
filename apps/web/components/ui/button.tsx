@@ -1,6 +1,11 @@
 import * as React from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "danger"
+  | "danger-outline";
 type Size = "sm" | "md" | "lg";
 
 const base =
@@ -14,7 +19,9 @@ const variants: Record<Variant, string> = {
   primary: "bg-accent text-accent-foreground hover:bg-accent-strong",
   secondary: "border border-border bg-card text-foreground hover:bg-muted",
   ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
-  danger: "text-red-600 hover:bg-red-500/10",
+  danger: "bg-red-600 text-white hover:bg-red-700",
+  "danger-outline":
+    "border border-red-500/40 text-red-600 hover:bg-red-500/10",
 };
 
 const sizes: Record<Size, string> = {

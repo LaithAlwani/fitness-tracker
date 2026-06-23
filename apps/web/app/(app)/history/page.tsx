@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@liftify/convex";
-import { CaretRight } from "@phosphor-icons/react";
+import { CaretRight, ArrowsClockwise } from "@phosphor-icons/react";
 import type { Doc } from "@liftify/convex/dataModel";
 
 function monthKey(ms: number) {
@@ -18,6 +18,14 @@ function dayDate(ms: number) {
     month: "short",
     day: "numeric",
   });
+}
+function fmtDur(sec: number | undefined) {
+  if (!sec || sec <= 0) return null;
+  const m = Math.round(sec / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r ? `${h}h ${r}m` : `${h}h`;
 }
 
 export default function HistoryPage() {
@@ -62,10 +70,13 @@ export default function HistoryPage() {
             </h2>
             <ul className="flex flex-col gap-2">
               {group.items.map((w) => (
-                <li key={w._id}>
+                <li
+                  key={w._id}
+                  className="flex items-center gap-1 rounded-xl border border-border pr-3 transition-colors hover:border-accent-strong/40"
+                >
                   <Link
                     href={`/workout/${w._id}`}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 transition-colors hover:border-accent-strong/40"
+                    className="min-w-0 flex-1 px-4 py-3"
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -80,9 +91,24 @@ export default function HistoryPage() {
                       <p className="mt-0.5 text-xs text-muted-foreground/70">
                         {w.exercises.length} exercises ·{" "}
                         {w.exercises.reduce((n, e) => n + e.sets.length, 0)} sets
+                        {fmtDur(w.durationSec) ? ` · ${fmtDur(w.durationSec)}` : ""}
                       </p>
                     </div>
-                    <CaretRight className="size-5 shrink-0 text-muted-foreground" />
+                  </Link>
+                  <Link
+                    href={`/workout/new?repeat=${w._id}`}
+                    aria-label={`Repeat ${w.name}`}
+                    title="Repeat this workout"
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/10 hover:text-accent-strong"
+                  >
+                    <ArrowsClockwise weight="bold" className="size-5" />
+                  </Link>
+                  <Link
+                    href={`/workout/${w._id}`}
+                    aria-label={`Open ${w.name}`}
+                    className="shrink-0 text-muted-foreground"
+                  >
+                    <CaretRight className="size-5" />
                   </Link>
                 </li>
               ))}

@@ -12,7 +12,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Info, Barbell, Flame, CalendarCheck, Target } from "@phosphor-icons/react";
+import {
+  Info,
+  Barbell,
+  Flame,
+  CalendarCheck,
+  Target,
+  Timer,
+} from "@phosphor-icons/react";
 import { StatCard } from "@/components/ui/stat-card";
 import { Heatmap } from "@/components/ui/heatmap";
 import { computeStreak } from "@/lib/streak";
@@ -35,6 +42,14 @@ function weekLabel(ms: number) {
     month: "short",
     day: "numeric",
   });
+}
+function fmtDur(sec: number) {
+  if (sec <= 0) return "—";
+  const m = Math.round(sec / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r ? `${h}h ${r}m` : `${h}h`;
 }
 
 const axisTick = { fontSize: 12, fill: "var(--muted-foreground)" };
@@ -92,6 +107,12 @@ export default function ProgressPage() {
     const k = startOfDay(w.date);
     dayValues.set(k, (dayValues.get(k) ?? 0) + 1);
   }
+  const durations = (workouts ?? [])
+    .map((w) => w.durationSec ?? 0)
+    .filter((d) => d > 0);
+  const avgDurationSec = durations.length
+    ? durations.reduce((s, d) => s + d, 0) / durations.length
+    : 0;
 
   return (
     <div className="container-page flex flex-col gap-6 py-8">
@@ -105,7 +126,7 @@ export default function ProgressPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <StatCard
               label="Total workouts"
               value={String(total)}
@@ -127,6 +148,12 @@ export default function ProgressPage() {
               value={avgPerWeek}
               sublabel="last 8 wk"
               icon={<Target weight="bold" className="size-4" />}
+            />
+            <StatCard
+              label="Avg session"
+              value={avgDurationSec > 0 ? fmtDur(avgDurationSec) : "—"}
+              sublabel="per workout"
+              icon={<Timer weight="bold" className="size-4" />}
             />
           </div>
 

@@ -16,6 +16,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import { NotificationBell } from "@/components/notification-bell";
+import { RestTimerProvider } from "@/components/rest-timer";
 
 const NAV: { href: string; label: string; icon: Icon }[] = [
   { href: "/", label: "Home", icon: House },
@@ -73,6 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   return (
+    <RestTimerProvider>
     <div className="flex min-h-full flex-1 flex-col md:pl-64">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-border bg-card md:flex">
@@ -179,5 +181,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </nav>
     </div>
+    </RestTimerProvider>
   );
 }

@@ -21,6 +21,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { StatCard } from "@/components/ui/stat-card";
 
 const MEAS_KEYS = ["waist", "chest", "arms", "hips", "thighs"] as const;
@@ -343,9 +344,8 @@ export default function BodyPage() {
                     <p className="mt-2 text-sm text-red-600">{editError}</p>
                   )}
                   <div className="mt-3 flex items-center justify-between gap-2">
-                    <Button
+                    <IconButton
                       variant="danger"
-                      size="sm"
                       aria-label="Delete entry"
                       onClick={() => {
                         removeEntry({ entryId: e._id });
@@ -353,7 +353,7 @@ export default function BodyPage() {
                       }}
                     >
                       <Trash className="size-4" />
-                    </Button>
+                    </IconButton>
                     <Button
                       size="sm"
                       aria-label="Save"

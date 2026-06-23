@@ -54,23 +54,35 @@ export function Heatmap({
 
   const level = (v: number) => (v <= 0 ? 0 : Math.min(4, Math.ceil((v / max) * 4)));
   const op = [1, 0.3, 0.52, 0.74, 1];
+  const fill = (c: { show: boolean; value: number }) => {
+    if (!c.show) return "transparent";
+    if (c.value <= 0) return "var(--muted)";
+    const pct = Math.round(op[level(c.value)] * 100);
+    return `color-mix(in srgb, var(--accent) ${pct}%, transparent)`;
+  };
 
   return (
-    <div className="flex gap-1 overflow-x-auto pb-1">
+    <div className="flex gap-1.5 overflow-x-auto pb-1">
       {cols.map((col, i) => (
-        <div key={i} className="flex flex-col gap-1">
+        <div key={i} className="flex flex-col gap-1.5">
           {col.map((c, j) => (
             <span
               key={j}
               title={
                 c.show ? `${new Date(c.day).toLocaleDateString()}: ${c.value}` : ""
               }
-              className="size-3 shrink-0 rounded-[3px]"
+              className="flex size-7 shrink-0 items-center justify-center rounded-md text-[11px] font-medium tabular-nums"
               style={{
-                backgroundColor: c.value > 0 ? "var(--accent)" : "var(--muted)",
-                opacity: !c.show ? 0 : c.value > 0 ? op[level(c.value)] : 1,
+                backgroundColor: fill(c),
+                color: !c.show
+                  ? "transparent"
+                  : c.value > 0
+                    ? "#fff"
+                    : "var(--muted-foreground)",
               }}
-            />
+            >
+              {c.show ? new Date(c.day).getDate() : ""}
+            </span>
           ))}
         </div>
       ))}

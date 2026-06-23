@@ -13,7 +13,8 @@ import {
   Trash,
   WarningCircle,
 } from "@phosphor-icons/react";
-import { buttonClass } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 
 function fmtDate(ms: number) {
   return new Date(ms).toLocaleDateString(undefined, {
@@ -110,13 +111,13 @@ export default function WorkoutDetailPage() {
           >
             <PencilSimple className="size-5" />
           </Link>
-          <button
+          <IconButton
+            variant="danger"
             onClick={() => setConfirmDelete(true)}
             aria-label="Delete workout"
-            className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
           >
             <Trash className="size-5" />
-          </button>
+          </IconButton>
         </div>
       </div>
 
@@ -177,20 +178,16 @@ export default function WorkoutDetailPage() {
               history.
             </p>
             <div className="mt-6 flex justify-end gap-2">
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => setConfirmDelete(false)}
                 disabled={deleting}
-                className="rounded-full border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
               >
                 Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="danger" onClick={handleDelete} disabled={deleting}>
                 {deleting ? "Deleting…" : "Delete"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -47,7 +47,19 @@ export default defineSchema({
     name: v.string(),
     muscleGroup: v.optional(v.string()),
     equipment: v.optional(v.string()),
-  }).index("by_name", ["name"]),
+    // Enriched from the Free Exercise DB (public domain).
+    externalId: v.optional(v.string()),
+    category: v.optional(v.string()),
+    level: v.optional(v.string()),
+    force: v.optional(v.string()),
+    mechanic: v.optional(v.string()),
+    primaryMuscles: v.optional(v.array(v.string())),
+    secondaryMuscles: v.optional(v.array(v.string())),
+    instructions: v.optional(v.array(v.string())),
+    images: v.optional(v.array(v.string())), // full CDN URLs
+  })
+    .index("by_name", ["name"])
+    .index("by_external_id", ["externalId"]),
 
   workouts: defineTable({
     userId: v.id("users"),

@@ -2,17 +2,32 @@ import { v } from "convex/values";
 
 import { internalMutation, query } from "./_generated/server";
 
-// Read-only exercise name library — powers fast autocomplete on the Log screen.
-// Liftify is lifting-focused, so this is a curated strength list.
+// Read-only exercise library — powers the Log screen picker. Returns a slim
+// projection (no instructions) plus a single thumbnail to keep the payload light.
 export const list = query({
   args: { search: v.optional(v.string()) },
   handler: async (ctx, { search }) => {
     const all = await ctx.db.query("exercises").withIndex("by_name").collect();
-    const sorted = all.sort((a, b) => a.name.localeCompare(b.name));
+    const slim = all
+      .map((e) => ({
+        _id: e._id,
+        name: e.name,
+        muscleGroup: e.muscleGroup,
+        equipment: e.equipment,
+        image: e.images?.[0],
+        hasDetail: (e.images?.length ?? 0) > 0 || (e.instructions?.length ?? 0) > 0,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
     const term = search?.trim().toLowerCase();
-    if (!term) return sorted;
-    return sorted.filter((e) => e.name.toLowerCase().includes(term));
+    if (!term) return slim;
+    return slim.filter((e) => e.name.toLowerCase().includes(term));
   },
+});
+
+// Full exercise record — for the detail / how-to view (images + instructions).
+export const getById = query({
+  args: { id: v.id("exercises") },
+  handler: async (ctx, { id }) => await ctx.db.get(id),
 });
 
 const SEED: Array<{ name: string; muscleGroup?: string; equipment?: string }> = [
@@ -89,5 +104,40 @@ export const seed = internalMutation({
       inserted += 1;
     }
     return { inserted, total: names.size + inserted };
+  },
+});
+
+// --- Free Exercise DB seeding (driven by exercisesSeed.ts node action) ---
+
+const exerciseFields = {
+  name: v.string(),
+  externalId: v.optional(v.string()),
+  muscleGroup: v.optional(v.string()),
+  equipment: v.optional(v.string()),
+  category: v.optional(v.string()),
+  level: v.optional(v.string()),
+  force: v.optional(v.string()),
+  mechanic: v.optional(v.string()),
+  primaryMuscles: v.optional(v.array(v.string())),
+  secondaryMuscles: v.optional(v.array(v.string())),
+  instructions: v.optional(v.array(v.string())),
+  images: v.optional(v.array(v.string())),
+};
+
+// Wipe the whole library (history is unaffected — workouts embed exercise names).
+export const clearAll = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("exercises").collect();
+    for (const e of all) await ctx.db.delete(e._id);
+    return { deleted: all.length };
+  },
+});
+
+export const insertBatch = internalMutation({
+  args: { items: v.array(v.object(exerciseFields)) },
+  handler: async (ctx, { items }) => {
+    for (const it of items) await ctx.db.insert("exercises", it);
+    return items.length;
   },
 });

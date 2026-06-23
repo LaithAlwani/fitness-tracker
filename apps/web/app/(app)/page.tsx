@@ -241,6 +241,12 @@ export default function HomePage() {
                   <p className="mt-0.5 truncate text-sm text-muted-foreground">
                     {w.exercises.map((e) => e.name).join(", ")}
                   </p>
+                  {w.durationSec ? (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground/70">
+                      <Timer className="size-3.5" />
+                      {fmtTime(w.durationSec)}
+                    </p>
+                  ) : null}
                 </Link>
               </li>
             ))}

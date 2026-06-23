@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import { Check, WarningCircle, Crown } from "@phosphor-icons/react";
-import { buttonClass } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { CardUpdate } from "@/components/card-update";
 
 const FEATURES = [
@@ -325,20 +325,20 @@ export default function SubscribePage() {
             </p>
             {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
             <div className="mt-6 flex justify-end gap-2">
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => setConfirmCancel(false)}
                 disabled={busy}
-                className="rounded-full border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
               >
                 Keep membership
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
                 onClick={() => runManage(() => cancelSub({}))}
                 disabled={busy}
-                className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
               >
                 {busy ? "Cancelling…" : "Cancel membership"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

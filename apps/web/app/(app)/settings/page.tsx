@@ -12,6 +12,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import { PushToggle } from "@/components/push-toggle";
+import { Button } from "@/components/ui/button";
 
 const UNITS = ["lb", "kg"] as const;
 
@@ -230,16 +231,17 @@ export default function SettingsPage() {
           Permanently delete your account and all your workouts and body data.
           This can&apos;t be undone.
         </p>
-        <button
+        <Button
+          variant="danger-outline"
           onClick={() => {
             setDeleteError(null);
             setConfirmDelete(true);
           }}
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-red-500/40 px-5 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/10"
+          className="mt-4"
         >
           <TrashSimple className="size-4" />
           Delete account
-        </button>
+        </Button>
       </section>
 
       {confirmDelete && (
@@ -267,20 +269,20 @@ export default function SettingsPage() {
               <p className="mt-3 text-sm text-red-600">{deleteError}</p>
             )}
             <div className="mt-6 flex justify-end gap-2">
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => setConfirmDelete(false)}
                 disabled={deleting}
-                className="rounded-full border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
               >
                 {deleting ? "Deleting…" : "Delete account"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -12,6 +12,7 @@ import type * as billing from "../billing.js";
 import type * as bodyEntries from "../bodyEntries.js";
 import type * as crons from "../crons.js";
 import type * as exercises from "../exercises.js";
+import type * as exercisesSeed from "../exercisesSeed.js";
 import type * as http from "../http.js";
 import type * as model from "../model.js";
 import type * as notifications from "../notifications.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   bodyEntries: typeof bodyEntries;
   crons: typeof crons;
   exercises: typeof exercises;
+  exercisesSeed: typeof exercisesSeed;
   http: typeof http;
   model: typeof model;
   notifications: typeof notifications;
