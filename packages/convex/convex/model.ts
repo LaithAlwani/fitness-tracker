@@ -3,11 +3,6 @@
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 
-export const TRIAL_MS = 30 * 24 * 60 * 60 * 1000; // 30-day trial
-
-// Founder deal: first N members on the yearly plan keep $29.99/yr for life.
-export const FOUNDER_TARGET = 100;
-
 export async function getCurrentUser(
   ctx: QueryCtx | MutationCtx,
 ): Promise<Doc<"users"> | null> {
@@ -50,8 +45,6 @@ export async function getOrCreateUser(
     firstName: identity.givenName ?? undefined,
     lastName: identity.familyName ?? undefined,
     units: "lb",
-    subscriptionStatus: "trialing",
-    trialEndsAt: now + TRIAL_MS,
     createdAt: now,
   });
   const created = await ctx.db.get(id);
@@ -59,17 +52,11 @@ export async function getOrCreateUser(
   return created;
 }
 
-// The whole app is paid: access = an active subscription or an unexpired trial.
-export function hasAccess(user: Doc<"users">, now: number): boolean {
-  if (user.subscriptionStatus === "active") return true;
-  if (user.subscriptionStatus === "trialing") {
-    return user.trialEndsAt === undefined || user.trialEndsAt > now;
-  }
-  return false;
+// Liftify is free — everyone has full access.
+export function hasAccess(_user: Doc<"users">, _now: number): boolean {
+  return true;
 }
 
-export function requireAccess(user: Doc<"users">, now: number): void {
-  if (!hasAccess(user, now)) {
-    throw new Error("Subscription required");
-  }
+export function requireAccess(_user: Doc<"users">, _now: number): void {
+  // Free app — nothing to gate.
 }

@@ -1,13 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser, useClerk, SignOutButton } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import {
   SignOut,
-  CaretRight,
   TrashSimple,
   WarningCircle,
   Minus,
@@ -108,7 +106,6 @@ const FONT_SIZES: { key: FontSize; label: string; px: string }[] = [
 
 export default function SettingsPage() {
   const me = useQuery(api.users.me, {});
-  const access = useQuery(api.users.accessState, {});
   const setUnits = useMutation(api.users.setUnits);
   const setPrefs = useMutation(api.users.setPreferences);
   const deleteData = useMutation(api.users.deleteAccount);
@@ -199,57 +196,6 @@ export default function SettingsPage() {
     "—";
   const email =
     me?.email || user?.primaryEmailAddress?.emailAddress || "—";
-
-  const trialDaysLeft =
-    access?.status === "trialing" && access.trialEndsAt
-      ? Math.max(0, Math.ceil((access.trialEndsAt - Date.now()) / 86_400_000))
-      : null;
-  const planLabel =
-    me?.billingInterval === "yearly"
-      ? me?.isFounder
-        ? "Founder · $29.99/yr"
-        : "Yearly · $99.99/yr"
-      : me?.billingInterval === "monthly"
-        ? "Monthly · $9.99/mo"
-        : null;
-
-  const membership =
-    access?.status === "trialing"
-      ? `Free trial — ${trialDaysLeft} ${trialDaysLeft === 1 ? "day" : "days"} left${planLabel ? ` · ${planLabel}` : ""}`
-      : access?.status === "active"
-        ? planLabel
-          ? `Active · ${planLabel}`
-          : "Active"
-        : access?.status === "past_due"
-          ? "Payment past due"
-          : "No active plan";
-
-  const fmtDate = (ms: number) =>
-    new Date(ms).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  const renewMs = me?.currentPeriodEnd;
-  const cancelling = !!me?.cancelAtPeriodEnd;
-  const planAmount =
-    me?.billingInterval === "yearly"
-      ? me?.isFounder
-        ? "$29.99"
-        : "$99.99"
-      : me?.billingInterval === "monthly"
-        ? "$9.99"
-        : null;
-  const amountSuffix = planAmount ? ` · ${planAmount}` : "";
-  const hasPaidSub = !!me?.stripeSubscriptionId;
-  const billingLine =
-    cancelling && renewMs
-      ? `Ends ${fmtDate(renewMs)}`
-      : hasPaidSub && renewMs
-        ? `Next payment ${fmtDate(renewMs)}${amountSuffix}`
-        : !hasPaidSub && access?.status === "trialing" && access.trialEndsAt
-          ? `Trial ends ${fmtDate(access.trialEndsAt)}`
-          : null;
 
   return (
     <div className="container-page flex max-w-xl flex-col gap-6 py-8">
@@ -381,23 +327,6 @@ export default function SettingsPage() {
           </div>
         </dl>
       </section>
-
-      {/* Membership */}
-      <Link
-        href="/subscribe"
-        className="flex items-center justify-between rounded-card border border-border bg-card p-5 transition-colors hover:border-accent-strong/40"
-      >
-        <div>
-          <h2 className="font-medium">Membership</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{membership}</p>
-          {billingLine && (
-            <p className="mt-0.5 text-xs text-muted-foreground/70">
-              {billingLine}
-            </p>
-          )}
-        </div>
-        <CaretRight className="size-5 text-muted-foreground" />
-      </Link>
 
       {/* Sign out */}
       <SignOutButton redirectUrl="/sign-in">

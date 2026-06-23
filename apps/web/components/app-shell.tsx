@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "@liftify/convex";
 import {
   House,
@@ -51,12 +51,10 @@ function isActive(pathname: string, href: string) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { user } = useUser();
   const { isAuthenticated } = useConvexAuth();
   const ensureUser = useMutation(api.users.getOrCreateCurrentUser);
   const ensureWeekly = useMutation(api.notifications.ensureWeekly);
-  const access = useQuery(api.users.accessState);
 
   const initial = (
     user?.firstName?.[0] ??
@@ -70,16 +68,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       .then(() => ensureWeekly())
       .catch(() => {});
   }, [isAuthenticated, ensureUser, ensureWeekly]);
-
-  useEffect(() => {
-    if (
-      access?.authenticated &&
-      !access.hasAccess &&
-      pathname !== "/subscribe"
-    ) {
-      router.replace("/subscribe");
-    }
-  }, [access, pathname, router]);
 
   const avatar = user?.imageUrl ? (
     <span className="size-8 overflow-hidden rounded-full border border-border">

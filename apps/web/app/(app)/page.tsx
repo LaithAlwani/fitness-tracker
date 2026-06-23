@@ -25,6 +25,7 @@ import {
 } from "recharts";
 import { buttonClass } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/stat-card";
+import { CountUp } from "@/components/ui/count-up";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { BodyDiagram } from "@/components/body-diagram";
 import { computeStreak } from "@/lib/streak";
@@ -60,7 +61,6 @@ function fmtTime(sec: number) {
 
 export default function HomePage() {
   const workouts = useQuery(api.workouts.listForUser, { limit: 120 });
-  const access = useQuery(api.users.accessState, {});
   const me = useQuery(api.users.me, {});
   const exercises = useQuery(api.exercises.list, {});
   const latestBodyWeight = useQuery(api.bodyEntries.latestWeight, {});
@@ -148,13 +148,6 @@ export default function HomePage() {
     return { label, volume: Math.round(vol) };
   });
 
-  const trialDaysLeft =
-    access?.status === "trialing" && access.trialEndsAt
-      ? Math.max(0, Math.ceil((access.trialEndsAt - Date.now()) / 86_400_000))
-      : null;
-
-  const loading = workouts === undefined;
-
   async function logRecovery(type: "rest" | "cardio" | "stretching") {
     setRecoveryNote(null);
     try {
@@ -164,6 +157,10 @@ export default function HomePage() {
       setRecoveryNote(null);
     }
   }
+
+  // Hold the dashboard until the user row exists (avoids a "lifter" name flash)
+  // and their workouts have loaded.
+  if (!me || workouts === undefined) return <HomeSkeleton />;
 
   return (
     <div className="container-page flex flex-col gap-6 py-8">
@@ -200,16 +197,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {trialDaysLeft !== null && (
-        <div className="rounded-card border border-accent-strong/40 bg-accent/10 px-4 py-3 text-sm">
-          <span className="font-medium">Free trial</span> — {trialDaysLeft}{" "}
-          {trialDaysLeft === 1 ? "day" : "days"} left.{" "}
-          <Link href="/subscribe" className="font-medium underline">
-            See plans
-          </Link>
-        </div>
-      )}
-
       {/* Greeting */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -231,25 +218,30 @@ export default function HomePage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Workouts"
-          value={loading ? "—" : String(weekCount)}
+          value={<CountUp value={weekCount} />}
           sublabel="this week"
           icon={<Barbell weight="bold" className="size-4" />}
         />
         <StatCard
           label="Volume"
-          value={loading ? "—" : weekVolume.toLocaleString()}
+          value={
+            <CountUp
+              value={weekVolume}
+              format={(n) => Math.round(n).toLocaleString()}
+            />
+          }
           sublabel={`${unit} this week`}
           icon={<ChartBar weight="bold" className="size-4" />}
         />
         <StatCard
           label="Time"
-          value={loading ? "—" : fmtTime(weekTime)}
+          value={<CountUp value={weekTime} format={fmtTime} />}
           sublabel="this week"
           icon={<Timer weight="bold" className="size-4" />}
         />
         <StatCard
           label="Streak"
-          value={loading ? "—" : String(streak)}
+          value={<CountUp value={streak} />}
           sublabel={streak === 1 ? "day" : "days"}
           icon={<Flame weight="fill" className="size-4" />}
         />
@@ -367,9 +359,7 @@ export default function HomePage() {
           )}
         </div>
 
-        {loading ? (
-          <div className="h-20 animate-pulse rounded-card border border-border bg-muted" />
-        ) : workouts && workouts.length > 0 ? (
+        {workouts.length > 0 ? (
           <ul className="flex flex-col gap-2">
             {workouts.slice(0, 6).map((w) => (
               <li key={w._id}>
@@ -404,6 +394,54 @@ export default function HomePage() {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function HomeSkeleton() {
+  return (
+    <div className="container-page flex animate-pulse flex-col gap-6 py-8">
+      {/* Greeting */}
+      <div className="flex items-end justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <div className="h-4 w-24 rounded bg-muted" />
+          <div className="h-9 w-44 rounded-lg bg-muted" />
+        </div>
+        <div className="h-12 w-36 rounded-full bg-muted" />
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-24 rounded-card border border-border bg-muted"
+          />
+        ))}
+      </div>
+
+      {/* Goal + activity */}
+      <div className="grid gap-3 lg:grid-cols-3">
+        <div className="h-64 rounded-card border border-border bg-muted" />
+        <div className="h-64 rounded-card border border-border bg-muted lg:col-span-2" />
+      </div>
+
+      {/* Body + recovery */}
+      <div className="grid gap-3 lg:grid-cols-3">
+        <div className="h-56 rounded-card border border-border bg-muted lg:col-span-2" />
+        <div className="h-56 rounded-card border border-border bg-muted" />
+      </div>
+
+      {/* Recent */}
+      <div className="flex flex-col gap-2">
+        <div className="h-4 w-32 rounded bg-muted" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-16 rounded-xl border border-border bg-muted"
+          />
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,20 +1,12 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
-// Liftify MVP schema — paid-only workout tracker.
-//   users       account + billing/access state (one row per Clerk user)
-//   exercises   seeded, read-only name library (for fast log autocomplete)
+// Liftify schema — a free workout tracker.
+//   users       account + preferences (one row per Clerk user)
+//   exercises   seeded, read-only exercise library
 //   workouts    one row per logged workout, exercises embedded as an array
+//   checkins    rest/cardio/stretch recovery days (keep a streak alive)
 //   bodyEntries journal-style body log (weight + optional measurements)
-// Streaks are derived client-side from workout dates — no extra table.
-
-export const subscriptionStatus = v.union(
-  v.literal("none"),
-  v.literal("trialing"),
-  v.literal("active"),
-  v.literal("past_due"),
-  v.literal("canceled"),
-);
 
 export default defineSchema({
   users: defineTable({
@@ -34,24 +26,10 @@ export default defineSchema({
     remindWeighIn: v.optional(v.boolean()),
     remindRest: v.optional(v.boolean()),
 
-    // Billing / access. The whole app is gated on this (trialing | active = in).
-    subscriptionStatus: subscriptionStatus,
-    trialEndsAt: v.optional(v.number()),
-    stripeCustomerId: v.optional(v.string()),
-    stripeSubscriptionId: v.optional(v.string()),
-    currentPeriodEnd: v.optional(v.number()),
-    cancelAtPeriodEnd: v.optional(v.boolean()),
-    isFounder: v.optional(v.boolean()), // claimed a first-100 lifetime price
-    billingInterval: v.optional(
-      v.union(v.literal("monthly"), v.literal("yearly")),
-    ),
     lastWeighInWeek: v.optional(v.number()), // weekKey we last handled the weigh-in reminder
 
     createdAt: v.number(),
-  })
-    .index("by_clerk_id", ["clerkId"])
-    .index("by_stripe_customer", ["stripeCustomerId"])
-    .index("by_founder", ["isFounder"]),
+  }).index("by_clerk_id", ["clerkId"]),
 
   exercises: defineTable({
     name: v.string(),

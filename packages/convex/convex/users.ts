@@ -1,13 +1,30 @@
 import { v } from "convex/values";
 
-import { mutation, query } from "./_generated/server";
-import {
-  getCurrentUser,
-  getCurrentUserOrThrow,
-  hasAccess,
-  TRIAL_MS,
-  FOUNDER_TARGET,
-} from "./model";
+import { mutation, query, internalMutation } from "./_generated/server";
+import { getCurrentUser, getCurrentUserOrThrow } from "./model";
+
+// One-time migration: strip legacy billing fields off every user doc so they
+// can be removed from the schema. Run: convex run users:dropBillingFields [--prod]
+export const dropBillingFields = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    for (const u of users) {
+      await ctx.db.patch(u._id, {
+        subscriptionStatus: undefined,
+        trialEndsAt: undefined,
+        stripeCustomerId: undefined,
+        stripeSubscriptionId: undefined,
+        currentPeriodEnd: undefined,
+        cancelAtPeriodEnd: undefined,
+        isFounder: undefined,
+        billingInterval: undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+    }
+    return { migrated: users.length };
+  },
+});
 
 // Called on first authenticated load. Creates the user row if missing and keeps
 // the profile in sync with Clerk. New users start a no-card 30-day trial so the
@@ -47,8 +64,6 @@ export const getOrCreateCurrentUser = mutation({
       firstName: identity.givenName ?? undefined,
       lastName: identity.familyName ?? undefined,
       units: "lb", // default; toggle to kg in settings later
-      subscriptionStatus: "trialing",
-      trialEndsAt: now + TRIAL_MS,
       createdAt: now,
     });
   },
@@ -59,42 +74,14 @@ export const me = query({
   handler: async (ctx) => getCurrentUser(ctx),
 });
 
-// Drives the (app) access gate.
+// Liftify is free — everyone authenticated has access.
 export const accessState = query({
   args: {},
   handler: async (ctx) => {
     const user = await getCurrentUser(ctx);
-    if (!user) {
-      return {
-        authenticated: false,
-        hasAccess: false,
-        status: "none" as const,
-        trialEndsAt: undefined as number | undefined,
-      };
-    }
     return {
-      authenticated: true,
-      hasAccess: hasAccess(user, Date.now()),
-      status: user.subscriptionStatus,
-      trialEndsAt: user.trialEndsAt,
-    };
-  },
-});
-
-// Public: how many founder (yearly-lifetime) spots are claimed. Drives the
-// landing-page counter and gates whether new yearly subs get the founder price.
-export const founderStatus = query({
-  args: {},
-  handler: async (ctx) => {
-    const founders = await ctx.db
-      .query("users")
-      .withIndex("by_founder", (q) => q.eq("isFounder", true))
-      .collect();
-    const claimed = Math.min(founders.length, FOUNDER_TARGET);
-    return {
-      claimed,
-      target: FOUNDER_TARGET,
-      available: founders.length < FOUNDER_TARGET,
+      authenticated: !!user,
+      hasAccess: true,
     };
   },
 });

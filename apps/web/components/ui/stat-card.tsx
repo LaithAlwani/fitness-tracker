@@ -7,7 +7,7 @@ export function StatCard({
   icon,
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   sublabel?: string;
   icon?: ReactNode;
 }) {
