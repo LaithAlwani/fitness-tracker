@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import { loggedExercises, exerciseSeries, withBodyweight } from "@/lib/prs";
+import { CountUp } from "@/components/ui/count-up";
 import {
   BarChart,
   Bar,
@@ -167,7 +168,7 @@ export default function ProgressPage() {
       <h1 className="text-3xl font-semibold tracking-tighter">Progress</h1>
 
       {workouts === undefined ? (
-        <div className="h-72 animate-pulse rounded-card border border-border bg-muted" />
+        <ProgressSkeleton />
       ) : !hasData ? (
         <div className="rounded-card border border-dashed border-border p-8 text-center text-muted-foreground">
           Log a few workouts and your charts will fill in here.
@@ -177,29 +178,39 @@ export default function ProgressPage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <StatCard
               label="Total workouts"
-              value={String(total)}
+              value={<CountUp value={total} />}
               icon={<Barbell weight="bold" className="size-4" />}
             />
             <StatCard
               label="This week"
-              value={String(thisWeekCount)}
+              value={<CountUp value={thisWeekCount} />}
               icon={<CalendarCheck weight="bold" className="size-4" />}
             />
             <StatCard
               label="Streak"
-              value={String(streak)}
+              value={<CountUp value={streak} />}
               sublabel={streak === 1 ? "day" : "days"}
               icon={<Flame weight="fill" className="size-4" />}
             />
             <StatCard
               label="Avg / week"
-              value={avgPerWeek}
+              value={
+                <CountUp
+                  value={Number(avgPerWeek)}
+                  format={(n) => n.toFixed(1)}
+                />
+              }
               sublabel="last 8 wk"
               icon={<Target weight="bold" className="size-4" />}
             />
             <StatCard
               label="Avg session"
-              value={avgDurationSec > 0 ? fmtDur(avgDurationSec) : "—"}
+              value={
+                <CountUp
+                  value={avgDurationSec}
+                  format={(n) => (n > 0 ? fmtDur(n) : "—")}
+                />
+              }
               sublabel="per workout"
               icon={<Timer weight="bold" className="size-4" />}
             />
@@ -325,6 +336,45 @@ export default function ProgressPage() {
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+function ProgressSkeleton() {
+  return (
+    <div className="flex animate-pulse flex-col gap-6">
+      {/* Stat row */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-24 rounded-card border border-border bg-muted"
+          />
+        ))}
+      </div>
+      {/* Chart cards */}
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-card border border-border bg-card p-5"
+        >
+          <div className="h-4 w-32 rounded bg-muted" />
+          <div className="mt-4 h-56 rounded-xl bg-muted" />
+        </div>
+      ))}
+      {/* Consistency heatmap */}
+      <div className="rounded-card border border-border bg-card p-5">
+        <div className="h-4 w-24 rounded bg-muted" />
+        <div className="mt-4 flex gap-1.5">
+          {Array.from({ length: 13 }).map((_, i) => (
+            <div key={i} className="flex flex-col gap-1.5">
+              {Array.from({ length: 7 }).map((_, j) => (
+                <div key={j} className="size-7 rounded-md bg-muted" />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
