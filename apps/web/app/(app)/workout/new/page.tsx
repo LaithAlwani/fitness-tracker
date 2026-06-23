@@ -19,6 +19,8 @@ import {
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import { PlateCalculator } from "@/components/plate-calculator";
+import { bestsByExercise, detectPRs, withBodyweight } from "@/lib/prs";
 import { useRest } from "@/components/rest-timer";
 
 type SetRow = { id: string; reps: string; weight: string; done?: boolean };
@@ -71,6 +73,7 @@ function LogWorkout() {
 
   const me = useQuery(api.users.me, {});
   const allExercises = useQuery(api.exercises.list, {});
+  const latestBodyWeight = useQuery(api.bodyEntries.latestWeight, {});
   const [detailId, setDetailId] = useState<Id<"exercises"> | null>(null);
   const detail = useQuery(
     api.exercises.getById,
@@ -88,6 +91,7 @@ function LogWorkout() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState<string | null>(null);
+  const [equip, setEquip] = useState<string | null>(null);
   const [scrollTarget, setScrollTarget] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +99,7 @@ function LogWorkout() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [finishPrompt, setFinishPrompt] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [plateOpen, setPlateOpen] = useState(false);
   // Which exercise cards are expanded. Adding an exercise collapses the rest.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [timer, setTimer] = useState<SessionTimer | null>(null);
@@ -243,6 +248,14 @@ function LogWorkout() {
       ),
     ].sort();
   }, [allExercises]);
+  const equipments = useMemo(() => {
+    if (!allExercises) return [];
+    return [
+      ...new Set(
+        allExercises.map((e) => e.equipment).filter((g): g is string => !!g),
+      ),
+    ].sort();
+  }, [allExercises]);
 
   // All-time heaviest weight per exercise, to show a +/- delta vs your best.
   const bestByExercise = useMemo(() => {
@@ -260,6 +273,19 @@ function LogWorkout() {
     }
     return map;
   }, [history]);
+
+  // Names of bodyweight-based moves + the lifter's effective body weight, for
+  // folding total load into PR detection.
+  const bodyweightNames = useMemo(
+    () =>
+      new Set(
+        (allExercises ?? [])
+          .filter((e) => e.equipment === "body only")
+          .map((e) => e.name.toLowerCase()),
+      ),
+    [allExercises],
+  );
+  const effBodyWeight = latestBodyWeight ?? me?.bodyWeight ?? 0;
 
   // Look up an exercise's thumbnail / detail by name, for the added cards.
   const exerciseByName = useMemo(() => {
@@ -281,6 +307,7 @@ function LogWorkout() {
   const visible = (allExercises ?? []).filter(
     (e) =>
       (!group || e.muscleGroup === group) &&
+      (!equip || e.equipment === equip) &&
       (!term || e.name.toLowerCase().includes(term)),
   );
 
@@ -347,8 +374,8 @@ function LogWorkout() {
       }),
     );
   }
-  // A set can only be finished once it has real reps and weight logged.
-  const canFinishSet = (s: SetRow) => toNum(s.reps) > 0 && toNum(s.weight) > 0;
+  // A set can be finished once it has reps. Weight may be 0 (bodyweight moves).
+  const canFinishSet = (s: SetRow) => toNum(s.reps) > 0;
   // Mark a set complete/incomplete; completing one kicks off the rest timer.
   function setSetDone(entryId: string, setId: string, done: boolean) {
     if (done) {
@@ -367,7 +394,7 @@ function LogWorkout() {
             },
       ),
     );
-    if (done) rest.start(REST_DEFAULT);
+    if (done) rest.start(me?.restSeconds ?? REST_DEFAULT);
   }
   function updateSet(entryId: string, setId: string, patch: Partial<SetRow>) {
     setEntries((prev) =>
@@ -446,6 +473,29 @@ function LogWorkout() {
       if (isEditing && editId) {
         await update({ workoutId: editId as Id<"workouts">, name, exercises });
       } else {
+        // Detect PRs vs prior history (with body weight folded into bodyweight
+        // moves), then hand off to the home celebration.
+        try {
+          const priorLoaded = withBodyweight(
+            history ?? [],
+            bodyweightNames,
+            effBodyWeight,
+          );
+          const nowLoaded = withBodyweight(
+            [{ date: 0, exercises }],
+            bodyweightNames,
+            effBodyWeight,
+          )[0].exercises;
+          const prs = detectPRs(nowLoaded, bestsByExercise(priorLoaded));
+          if (prs.length > 0) {
+            localStorage.setItem(
+              "liftify:new-prs",
+              JSON.stringify({ unit, prs }),
+            );
+          }
+        } catch {
+          /* PR detection is best-effort */
+        }
         await create({ name, durationSec, exercises });
       }
       try {
@@ -503,7 +553,22 @@ function LogWorkout() {
             {fmtDuration(elapsedSec)}
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setPlateOpen(true)}
+          aria-label="Plate calculator"
+          title="Plate calculator"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Barbell weight="bold" className="size-5" />
+        </button>
       </div>
+
+      <PlateCalculator
+        open={plateOpen}
+        unit={unit}
+        onClose={() => setPlateOpen(false)}
+      />
 
       {/* Current workout */}
       {entries.length > 0 && (
@@ -675,9 +740,7 @@ function LogWorkout() {
                           onClick={() => setSetDone(entry.id, lastSet.id, true)}
                           disabled={!canFinishSet(lastSet)}
                           title={
-                            canFinishSet(lastSet)
-                              ? undefined
-                              : "Enter reps and weight first"
+                            canFinishSet(lastSet) ? undefined : "Enter reps first"
                           }
                           className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-accent"
                         >
@@ -769,16 +832,32 @@ function LogWorkout() {
                 />
               </div>
 
-              {/* Filter pills — scroll horizontally */}
-              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {/* Muscle-group pills — scroll horizontally */}
+              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <FilterPill active={group === null} onClick={() => setGroup(null)}>
-                  All
+                  All muscles
                 </FilterPill>
                 {groups.map((g) => (
                   <FilterPill
                     key={g}
                     active={group === g}
                     onClick={() => setGroup(group === g ? null : g)}
+                  >
+                    {g}
+                  </FilterPill>
+                ))}
+              </div>
+
+              {/* Equipment pills */}
+              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <FilterPill active={equip === null} onClick={() => setEquip(null)}>
+                  All equipment
+                </FilterPill>
+                {equipments.map((g) => (
+                  <FilterPill
+                    key={g}
+                    active={equip === g}
+                    onClick={() => setEquip(equip === g ? null : g)}
                   >
                     {g}
                   </FilterPill>
@@ -991,7 +1070,7 @@ function LogWorkout() {
               </span>
               .{" "}
               {pendingNeedsData
-                ? "Add reps and weight (or remove the set), then finish your workout."
+                ? "Add reps (or remove the set), then finish your workout."
                 : "Finish it first, then wrap up your workout."}
             </p>
             <div className="mt-6 flex justify-end gap-2">

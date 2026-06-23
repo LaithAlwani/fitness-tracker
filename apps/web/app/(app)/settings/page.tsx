@@ -10,11 +10,52 @@ import {
   CaretRight,
   TrashSimple,
   WarningCircle,
+  Minus,
+  Plus,
 } from "@phosphor-icons/react";
 import { PushToggle } from "@/components/push-toggle";
 import { Button } from "@/components/ui/button";
 
 const UNITS = ["lb", "kg"] as const;
+
+function fmtRest(sec: number) {
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return s ? `${m}:${String(s).padStart(2, "0")}` : `${m} min`;
+}
+
+function Stepper({
+  value,
+  onDec,
+  onInc,
+}: {
+  value: string;
+  onDec: () => void;
+  onInc: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1 rounded-full border border-border p-1">
+      <button
+        onClick={onDec}
+        aria-label="Decrease"
+        className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <Minus weight="bold" className="size-4" />
+      </button>
+      <span className="min-w-14 text-center text-sm font-semibold tabular-nums">
+        {value}
+      </span>
+      <button
+        onClick={onInc}
+        aria-label="Increase"
+        className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <Plus weight="bold" className="size-4" />
+      </button>
+    </div>
+  );
+}
 
 type FontSize = "sm" | "base" | "lg";
 const FONT_SIZES: { key: FontSize; label: string; px: string }[] = [
@@ -27,9 +68,39 @@ export default function SettingsPage() {
   const me = useQuery(api.users.me, {});
   const access = useQuery(api.users.accessState, {});
   const setUnits = useMutation(api.users.setUnits);
+  const setPrefs = useMutation(api.users.setPreferences);
   const deleteData = useMutation(api.users.deleteAccount);
   const { user } = useUser();
   const { signOut } = useClerk();
+
+  // Training prefs — seeded from the server, updated optimistically.
+  const [goal, setGoal] = useState(4);
+  const [rest, setRest] = useState(90);
+  const [bw, setBw] = useState(0);
+  useEffect(() => {
+    if (me?.weeklyGoal) setGoal(me.weeklyGoal);
+  }, [me?.weeklyGoal]);
+  useEffect(() => {
+    if (me?.restSeconds) setRest(me.restSeconds);
+  }, [me?.restSeconds]);
+  useEffect(() => {
+    if (me?.bodyWeight) setBw(me.bodyWeight);
+  }, [me?.bodyWeight]);
+  function changeGoal(n: number) {
+    const v = Math.min(14, Math.max(1, n));
+    setGoal(v);
+    setPrefs({ weeklyGoal: v });
+  }
+  function changeRest(n: number) {
+    const v = Math.min(600, Math.max(15, n));
+    setRest(v);
+    setPrefs({ restSeconds: v });
+  }
+  function commitBw() {
+    const v = Math.max(0, Math.round(bw * 10) / 10);
+    setBw(v);
+    setPrefs({ bodyWeight: v });
+  }
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -178,6 +249,65 @@ export default function SettingsPage() {
               {f.label}
             </button>
           ))}
+        </div>
+      </section>
+
+      {/* Training */}
+      <section className="rounded-card border border-border bg-card p-5">
+        <h2 className="font-medium">Training</h2>
+        <div className="mt-4 flex flex-col gap-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Weekly goal</p>
+              <p className="text-xs text-muted-foreground">
+                Target workouts per week.
+              </p>
+            </div>
+            <Stepper
+              value={`${goal}`}
+              onDec={() => changeGoal(goal - 1)}
+              onInc={() => changeGoal(goal + 1)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Default rest timer</p>
+              <p className="text-xs text-muted-foreground">
+                Starts automatically when you finish a set.
+              </p>
+            </div>
+            <Stepper
+              value={fmtRest(rest)}
+              onDec={() => changeRest(rest - 15)}
+              onInc={() => changeRest(rest + 15)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Body weight</p>
+              <p className="text-xs text-muted-foreground">
+                Adds your weight to bodyweight moves (pull-ups, dips…) so volume
+                and PRs reflect total load.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.5"
+                value={bw || ""}
+                onChange={(e) => setBw(Number(e.target.value) || 0)}
+                onBlur={commitBw}
+                placeholder="0"
+                aria-label="Body weight"
+                className="h-9 w-20 rounded-full border border-border bg-background px-3 text-center text-sm font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <span className="text-sm font-medium uppercase text-muted-foreground">
+                {unit}
+              </span>
+            </div>
+          </div>
         </div>
       </section>
 

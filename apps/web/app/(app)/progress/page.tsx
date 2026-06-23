@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@liftify/convex";
+import { loggedExercises, exerciseSeries, withBodyweight } from "@/lib/prs";
 import {
   BarChart,
   Bar,
@@ -19,6 +21,7 @@ import {
   CalendarCheck,
   Target,
   Timer,
+  CaretDown,
 } from "@phosphor-icons/react";
 import { StatCard } from "@/components/ui/stat-card";
 import { Heatmap } from "@/components/ui/heatmap";
@@ -63,7 +66,25 @@ const tooltipStyle = {
 export default function ProgressPage() {
   const me = useQuery(api.users.me, {});
   const workouts = useQuery(api.workouts.listForUser, { limit: 300 });
+  const exercises = useQuery(api.exercises.list, {});
+  const latestBodyWeight = useQuery(api.bodyEntries.latestWeight, {});
   const unit = me?.units ?? "lb";
+
+  // Fold body weight into bodyweight moves so volume / 1RM reflect total load.
+  const bwNames = useMemo(
+    () =>
+      new Set(
+        (exercises ?? [])
+          .filter((e) => e.equipment === "body only")
+          .map((e) => e.name.toLowerCase()),
+      ),
+    [exercises],
+  );
+  const effBodyWeight = latestBodyWeight ?? me?.bodyWeight ?? 0;
+  const loadWorkouts = useMemo(
+    () => withBodyweight(workouts ?? [], bwNames, effBodyWeight),
+    [workouts, bwNames, effBodyWeight],
+  );
 
   const WEEKS = 8;
   let weeks: { label: string; count: number; volume: number }[] = [];
@@ -73,7 +94,7 @@ export default function ProgressPage() {
     for (let i = WEEKS - 1; i >= 0; i--) {
       buckets.set(thisWeek - i * 7 * DAY, { count: 0, volume: 0 });
     }
-    for (const w of workouts) {
+    for (const w of loadWorkouts) {
       const b = buckets.get(startOfWeek(w.date));
       if (!b) continue;
       b.count += 1;
@@ -113,6 +134,28 @@ export default function ProgressPage() {
   const avgDurationSec = durations.length
     ? durations.reduce((s, d) => s + d, 0) / durations.length
     : 0;
+
+  // Per-exercise progress (estimated 1RM over time).
+  const exerciseOptions = loggedExercises(workouts ?? []);
+  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  useEffect(() => {
+    if (selectedExercise === null && exerciseOptions.length > 0) {
+      setSelectedExercise(exerciseOptions[0].name);
+    }
+  }, [selectedExercise, exerciseOptions]);
+  const series = selectedExercise
+    ? exerciseSeries(loadWorkouts, selectedExercise)
+    : [];
+  // Pure bodyweight moves never log weight → no est. 1RM; track reps instead.
+  // If a move is ever loaded (plates/belt), chart est. 1RM and drop any
+  // bodyweight-only sessions so they don't show as a misleading 0.
+  const bodyweight = series.length > 0 && series.every((p) => p.e1rm === 0);
+  const seriesData = (bodyweight
+    ? series.map((p) => ({ label: weekLabel(p.date), value: p.reps }))
+    : series
+        .filter((p) => p.e1rm > 0)
+        .map((p) => ({ label: weekLabel(p.date), value: p.e1rm }))
+  );
 
   return (
     <div className="container-page flex flex-col gap-6 py-8">
@@ -194,6 +237,75 @@ export default function ProgressPage() {
               />
             </LineChart>
           </ChartCard>
+
+          {exerciseOptions.length > 0 && (
+            <section className="rounded-card border border-border bg-card p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-medium text-muted-foreground">
+                  Exercise progress
+                </h2>
+                <div className="relative max-w-[60%]">
+                  <select
+                    value={selectedExercise ?? ""}
+                    onChange={(e) => setSelectedExercise(e.target.value)}
+                    className="h-9 w-full appearance-none rounded-full border border-border bg-background pl-3 pr-9 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {exerciseOptions.map((e) => (
+                      <option key={e.name} value={e.name}>
+                        {e.name}
+                      </option>
+                    ))}
+                  </select>
+                  <CaretDown
+                    weight="bold"
+                    className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  />
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {bodyweight
+                  ? "Top set reps per session"
+                  : `Estimated 1-rep max (${unit}) per session`}
+              </p>
+              {seriesData.length >= 2 ? (
+                <div className="mt-4 h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={seriesData}
+                      margin={{ top: 8, right: 8, bottom: 0, left: -8 }}
+                    >
+                      <XAxis
+                        dataKey="label"
+                        tick={axisTick}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        domain={["dataMin - 5", "dataMax + 5"]}
+                        tick={axisTick}
+                        tickLine={false}
+                        axisLine={false}
+                        width={40}
+                      />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        name={bodyweight ? "Top reps" : "Est. 1RM"}
+                        stroke="#8b5cf6"
+                        strokeWidth={2.5}
+                        dot={{ r: 3, fill: "#8b5cf6" }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Log this exercise at least twice to see your trend.
+                </p>
+              )}
+            </section>
+          )}
 
           <section className="rounded-card border border-border bg-card p-5">
             <h2 className="text-sm font-medium text-muted-foreground">

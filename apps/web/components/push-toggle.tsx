@@ -46,13 +46,27 @@ export function PushToggle() {
       if (perm !== "granted") {
         throw new Error("Notification permission was not granted.");
       }
-      const reg = await navigator.serviceWorker.getRegistration();
+      // Make sure a service worker is registered and active. It may not be yet
+      // (auto-register only runs in production, and registration is async), so
+      // register on demand and wait until it's controlling the page.
+      let reg = await navigator.serviceWorker.getRegistration();
       if (!reg) {
-        throw new Error(
-          "No service worker yet — install Liftify to your Home Screen (or use the deployed site) to enable push.",
-        );
+        try {
+          reg = await navigator.serviceWorker.register("/sw.js");
+        } catch {
+          throw new Error(
+            "Couldn't start the background service. Make sure you're on https (or have added Liftify to your Home Screen on iPhone), then try again.",
+          );
+        }
       }
-      const sub = await reg.pushManager.subscribe({
+      const ready = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<ServiceWorkerRegistration | null>((resolve) =>
+          setTimeout(() => resolve(null), 10_000),
+        ),
+      ]);
+      const active = ready ?? reg;
+      const sub = await active.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapid),
       });

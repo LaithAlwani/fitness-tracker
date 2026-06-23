@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import {
@@ -12,7 +12,10 @@ import {
   Target,
   ChartBar,
   ClockCounterClockwise,
+  Trophy,
+  X,
 } from "@phosphor-icons/react";
+import { withBodyweight, type PR } from "@/lib/prs";
 import {
   BarChart,
   Bar,
@@ -26,7 +29,7 @@ import { ProgressRing } from "@/components/ui/progress-ring";
 import { computeStreak } from "@/lib/streak";
 
 const DAY = 86_400_000;
-const WEEKLY_GOAL = 4; // target workouts per week
+const DEFAULT_WEEKLY_GOAL = 4; // target workouts per week (until the user sets one)
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function startOfWeek(ms: number) {
@@ -58,6 +61,8 @@ export default function HomePage() {
   const workouts = useQuery(api.workouts.listForUser, { limit: 120 });
   const access = useQuery(api.users.accessState, {});
   const me = useQuery(api.users.me, {});
+  const exercises = useQuery(api.exercises.list, {});
+  const latestBodyWeight = useQuery(api.bodyEntries.latestWeight, {});
 
   const [hasDraft, setHasDraft] = useState(false);
   useEffect(() => {
@@ -68,13 +73,51 @@ export default function HomePage() {
     }
   }, []);
 
+  // Celebrate PRs handed off by the just-finished workout (one-shot).
+  const [prCelebration, setPrCelebration] = useState<{
+    unit: string;
+    prs: PR[];
+  } | null>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("liftify:new-prs");
+      if (raw) {
+        setPrCelebration(JSON.parse(raw));
+        localStorage.removeItem("liftify:new-prs");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const unit = me?.units ?? "lb";
   const name = me?.firstName ?? "lifter";
+  const weeklyGoal = me?.weeklyGoal ?? DEFAULT_WEEKLY_GOAL;
+
+  // Fold body weight into bodyweight moves so volume reflects total load.
+  const bwNames = useMemo(
+    () =>
+      new Set(
+        (exercises ?? [])
+          .filter((e) => e.equipment === "body only")
+          .map((e) => e.name.toLowerCase()),
+      ),
+    [exercises],
+  );
+  const effBodyWeight = latestBodyWeight ?? me?.bodyWeight ?? 0;
+  const loadWorkouts = useMemo(
+    () => withBodyweight(workouts ?? [], bwNames, effBodyWeight),
+    [workouts, bwNames, effBodyWeight],
+  );
 
   const weekStart = startOfWeek(Date.now());
   const thisWeek = (workouts ?? []).filter((w) => w.date >= weekStart);
   const weekCount = thisWeek.length;
-  const weekVolume = Math.round(thisWeek.reduce((s, w) => s + workoutVolume(w), 0));
+  const weekVolume = Math.round(
+    loadWorkouts
+      .filter((w) => w.date >= weekStart)
+      .reduce((s, w) => s + workoutVolume(w), 0),
+  );
   const weekSets = thisWeek.reduce(
     (s, w) => s + w.exercises.reduce((n, e) => n + e.sets.length, 0),
     0,
@@ -86,7 +129,7 @@ export default function HomePage() {
   const weekData = DAY_LABELS.map((label, i) => {
     const dayStart = weekStart + i * DAY;
     const dayEnd = dayStart + DAY;
-    const vol = (workouts ?? [])
+    const vol = loadWorkouts
       .filter((w) => w.date >= dayStart && w.date < dayEnd)
       .reduce((s, w) => s + workoutVolume(w), 0);
     return { label, volume: Math.round(vol) };
@@ -101,6 +144,39 @@ export default function HomePage() {
 
   return (
     <div className="container-page flex flex-col gap-6 py-8">
+      {prCelebration && prCelebration.prs.length > 0 && (
+        <div className="relative overflow-hidden rounded-card border border-accent-strong/40 bg-accent/10 p-4">
+          <button
+            onClick={() => setPrCelebration(null)}
+            aria-label="Dismiss"
+            className="absolute right-3 top-3 flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+          <div className="flex items-center gap-2 text-accent-strong">
+            <Trophy weight="fill" className="size-5" />
+            <span className="font-semibold tracking-tight">
+              {prCelebration.prs.length === 1
+                ? "New personal record!"
+                : `${prCelebration.prs.length} new personal records!`}
+            </span>
+          </div>
+          <ul className="mt-2 flex flex-col gap-1 pr-6 text-sm">
+            {prCelebration.prs.map((pr) => (
+              <li key={`${pr.name}-${pr.type}`}>
+                <span className="font-medium">{pr.name}</span> —{" "}
+                {pr.type === "reps"
+                  ? `${pr.value} reps`
+                  : `${pr.value} ${prCelebration.unit}${pr.type === "strength" ? " est. 1RM" : ""}`}{" "}
+                <span className="text-muted-foreground">
+                  (was {pr.previous})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {trialDaysLeft !== null && (
         <div className="rounded-card border border-accent-strong/40 bg-accent/10 px-4 py-3 text-sm">
           <span className="font-medium">Free trial</span> — {trialDaysLeft}{" "}
@@ -165,14 +241,14 @@ export default function HomePage() {
           </div>
           <ProgressRing
             value={weekCount}
-            max={WEEKLY_GOAL}
-            label={`${weekCount}/${WEEKLY_GOAL}`}
+            max={weeklyGoal}
+            label={`${weekCount}/${weeklyGoal}`}
             sublabel="workouts"
           />
           <p className="text-center text-xs text-muted-foreground">
-            {weekCount >= WEEKLY_GOAL
+            {weekCount >= weeklyGoal
               ? "Goal smashed — nice work."
-              : `${WEEKLY_GOAL - weekCount} to go this week`}
+              : `${weeklyGoal - weekCount} to go this week`}
           </p>
         </section>
 

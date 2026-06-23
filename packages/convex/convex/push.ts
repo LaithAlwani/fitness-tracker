@@ -8,6 +8,7 @@ import {
   internalMutation,
 } from "./_generated/server";
 import { api, internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { getCurrentUser, getCurrentUserOrThrow } from "./model";
 
 // Store / refresh a device's push subscription for the current user.
@@ -73,6 +74,45 @@ export const deleteSub = internalMutation({
   args: { id: v.id("pushSubscriptions") },
   handler: async (ctx, { id }) => {
     await ctx.db.delete(id);
+  },
+});
+
+// Schedule a "rest complete" push for `seconds` from now. Returns the scheduled
+// job id (or null if the user has no subscribed device) so the client can cancel
+// it if the rest is skipped or adjusted.
+export const scheduleRestDone = mutation({
+  args: { seconds: v.number() },
+  handler: async (ctx, { seconds }): Promise<string | null> => {
+    const user = await getCurrentUser(ctx);
+    if (!user) return null;
+    const subs = await ctx.db
+      .query("pushSubscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .take(1);
+    if (subs.length === 0) return null; // nothing to notify
+    const id = await ctx.scheduler.runAfter(
+      Math.max(0, Math.round(seconds * 1000)),
+      internal.pushSender.sendPush,
+      {
+        userId: user._id,
+        title: "Rest complete 💪",
+        body: "Time for your next set.",
+        url: "/workout/new",
+      },
+    );
+    return id as string;
+  },
+});
+
+// Cancel a previously-scheduled push (e.g. rest skipped before it fired).
+export const cancelScheduled = mutation({
+  args: { id: v.string() },
+  handler: async (ctx, { id }) => {
+    try {
+      await ctx.scheduler.cancel(id as Id<"_scheduled_functions">);
+    } catch {
+      /* already ran or unknown id */
+    }
   },
 });
 

@@ -24,6 +24,11 @@ export default defineSchema({
     lastName: v.optional(v.string()),
     units: v.union(v.literal("kg"), v.literal("lb")),
 
+    // Training preferences.
+    weeklyGoal: v.optional(v.number()), // target workouts per week
+    restSeconds: v.optional(v.number()), // default rest timer length
+    bodyWeight: v.optional(v.number()), // for bodyweight-load math (in `units`)
+
     // Billing / access. The whole app is gated on this (trialing | active = in).
     subscriptionStatus: subscriptionStatus,
     trialEndsAt: v.optional(v.number()),

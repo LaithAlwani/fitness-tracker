@@ -99,6 +99,11 @@ export const founderStatus = query({
   },
 });
 
+const LB_PER_KG = 2.2046226218;
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+// Switch weight units AND convert every stored weight (workouts, body entries,
+// bodyweight default) so all numbers across the app read correctly afterward.
 export const setUnits = mutation({
   args: { units: v.union(v.literal("kg"), v.literal("lb")) },
   handler: async (ctx, { units }) => {
@@ -109,7 +114,70 @@ export const setUnits = mutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
     if (!user) throw new Error("User row missing");
-    await ctx.db.patch(user._id, { units });
+    if (user.units === units) return; // no change
+
+    // Only two units, so the direction is implied by the target.
+    const factor = units === "kg" ? 1 / LB_PER_KG : LB_PER_KG;
+    const conv = (w: number) => (w > 0 ? round1(w * factor) : w);
+
+    const workouts = await ctx.db
+      .query("workouts")
+      .withIndex("by_user_date", (q) => q.eq("userId", user._id))
+      .collect();
+    for (const w of workouts) {
+      await ctx.db.patch(w._id, {
+        exercises: w.exercises.map((ex) => ({
+          ...ex,
+          sets: ex.sets.map((s) => ({ ...s, weight: conv(s.weight) })),
+        })),
+      });
+    }
+
+    const entries = await ctx.db
+      .query("bodyEntries")
+      .withIndex("by_user_date", (q) => q.eq("userId", user._id))
+      .collect();
+    for (const e of entries) {
+      await ctx.db.patch(e._id, { weight: conv(e.weight) });
+    }
+
+    await ctx.db.patch(user._id, {
+      units,
+      ...(user.bodyWeight ? { bodyWeight: conv(user.bodyWeight) } : {}),
+    });
+  },
+});
+
+// Update training preferences (weekly goal, rest length, bodyweight default).
+export const setPreferences = mutation({
+  args: {
+    weeklyGoal: v.optional(v.number()),
+    restSeconds: v.optional(v.number()),
+    bodyWeight: v.optional(v.number()),
+  },
+  handler: async (ctx, { weeklyGoal, restSeconds, bodyWeight }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) throw new Error("User row missing");
+    const patch: {
+      weeklyGoal?: number;
+      restSeconds?: number;
+      bodyWeight?: number;
+    } = {};
+    if (weeklyGoal !== undefined) {
+      patch.weeklyGoal = Math.min(14, Math.max(1, Math.round(weeklyGoal)));
+    }
+    if (restSeconds !== undefined) {
+      patch.restSeconds = Math.min(600, Math.max(15, Math.round(restSeconds)));
+    }
+    if (bodyWeight !== undefined) {
+      patch.bodyWeight = Math.max(0, round1(bodyWeight));
+    }
+    await ctx.db.patch(user._id, patch);
   },
 });
 

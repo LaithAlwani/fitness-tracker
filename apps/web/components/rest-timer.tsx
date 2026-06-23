@@ -9,9 +9,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useMutation } from "convex/react";
+import { api } from "@liftify/convex";
 import { Timer } from "@phosphor-icons/react";
 
 const STORAGE_KEY = "liftify:rest-ends-at";
+const PUSH_KEY = "liftify:rest-push-id";
 
 function fmtClock(sec: number) {
   const m = Math.floor(sec / 60);
@@ -65,8 +68,58 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   const [endsAt, setEndsAt] = useState<number | null>(null);
   const [now, setNow] = useState(0);
   const firedRef = useRef(false);
+  const endsAtRef = useRef<number | null>(null);
+  const pushIdRef = useRef<string | null>(null);
+  const scheduleMut = useMutation(api.push.scheduleRestDone);
+  const cancelMut = useMutation(api.push.cancelScheduled);
 
-  // Restore a still-running timer after a reload or remount.
+  useEffect(() => {
+    endsAtRef.current = endsAt;
+  }, [endsAt]);
+
+  // Cancel a pending "rest done" push (skip / restart).
+  const clearScheduledPush = useCallback(() => {
+    const id = pushIdRef.current;
+    pushIdRef.current = null;
+    try {
+      localStorage.removeItem(PUSH_KEY);
+    } catch {
+      /* ignore */
+    }
+    if (id) cancelMut({ id }).catch(() => {});
+  }, [cancelMut]);
+
+  // Schedule a server push for when this rest ends (so it fires even if the
+  // app is backgrounded / the phone is locked). Replaces any pending one.
+  const scheduleDonePush = useCallback(
+    async (sec: number) => {
+      const prev = pushIdRef.current;
+      pushIdRef.current = null;
+      try {
+        localStorage.removeItem(PUSH_KEY);
+      } catch {
+        /* ignore */
+      }
+      if (prev) cancelMut({ id: prev }).catch(() => {});
+      if (sec <= 0) return;
+      try {
+        const id = await scheduleMut({ seconds: sec });
+        if (id) {
+          pushIdRef.current = id;
+          try {
+            localStorage.setItem(PUSH_KEY, id);
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        /* best-effort */
+      }
+    },
+    [cancelMut, scheduleMut],
+  );
+
+  // Restore a still-running timer (and its pending push) after a reload.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -75,6 +128,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         if (Number.isFinite(t) && t > Date.now()) setEndsAt(t);
         else localStorage.removeItem(STORAGE_KEY);
       }
+      const pid = localStorage.getItem(PUSH_KEY);
+      if (pid) pushIdRef.current = pid;
     } catch {
       /* ignore */
     }
@@ -117,20 +172,38 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       } catch {
         /* vibration unsupported */
       }
+      // Drop the local handle but let the scheduled push fire — don't cancel.
+      pushIdRef.current = null;
+      try {
+        localStorage.removeItem(PUSH_KEY);
+      } catch {
+        /* ignore */
+      }
       setEndsAt(null);
     }
   }, [remaining, endsAt]);
 
-  const start = useCallback((sec: number) => {
-    firedRef.current = false;
-    setEndsAt(Date.now() + sec * 1000);
-  }, []);
-  const adjust = useCallback((delta: number) => {
-    setEndsAt((prev) =>
-      Math.max(Date.now() + 1000, (prev ?? Date.now()) + delta * 1000),
-    );
-  }, []);
-  const stop = useCallback(() => setEndsAt(null), []);
+  const start = useCallback(
+    (sec: number) => {
+      firedRef.current = false;
+      setEndsAt(Date.now() + sec * 1000);
+      scheduleDonePush(sec);
+    },
+    [scheduleDonePush],
+  );
+  const adjust = useCallback(
+    (delta: number) => {
+      const base = endsAtRef.current ?? Date.now();
+      const next = Math.max(Date.now() + 1000, base + delta * 1000);
+      setEndsAt(next);
+      scheduleDonePush(Math.round((next - Date.now()) / 1000));
+    },
+    [scheduleDonePush],
+  );
+  const stop = useCallback(() => {
+    setEndsAt(null);
+    clearScheduledPush();
+  }, [clearScheduledPush]);
 
   return (
     <RestContext.Provider value={{ remaining, start, adjust, stop }}>

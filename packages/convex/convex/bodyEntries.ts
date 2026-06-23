@@ -16,6 +16,21 @@ const measurements = v.object({
   thighs: v.optional(v.number()),
 });
 
+// Most recent logged body weight (for bodyweight-load math). Null if none.
+export const latestWeight = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) return null;
+    const last = await ctx.db
+      .query("bodyEntries")
+      .withIndex("by_user_date", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .first();
+    return last?.weight ?? null;
+  },
+});
+
 export const create = mutation({
   args: {
     weight: v.number(),
