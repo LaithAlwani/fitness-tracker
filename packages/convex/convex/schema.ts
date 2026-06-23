@@ -28,6 +28,11 @@ export default defineSchema({
     weeklyGoal: v.optional(v.number()), // target workouts per week
     restSeconds: v.optional(v.number()), // default rest timer length
     bodyWeight: v.optional(v.number()), // for bodyweight-load math (in `units`)
+    lastExerciseReminderDay: v.optional(v.number()), // dayKey of last daily nudge
+    // Reminder toggles (undefined = on by default).
+    remindExercise: v.optional(v.boolean()),
+    remindWeighIn: v.optional(v.boolean()),
+    remindRest: v.optional(v.boolean()),
 
     // Billing / access. The whole app is gated on this (trialing | active = in).
     subscriptionStatus: subscriptionStatus,
@@ -82,6 +87,18 @@ export default defineSchema({
           }),
         ),
       }),
+    ),
+  }).index("by_user_date", ["userId", "date"]),
+
+  // Active-recovery check-ins (rest / cardio / stretching) that keep a streak
+  // alive without being a full lifting workout.
+  checkins: defineTable({
+    userId: v.id("users"),
+    date: v.number(),
+    type: v.union(
+      v.literal("rest"),
+      v.literal("cardio"),
+      v.literal("stretching"),
     ),
   }).index("by_user_date", ["userId", "date"]),
 

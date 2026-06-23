@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@liftify/convex";
 import {
   Flame,
@@ -26,6 +26,7 @@ import {
 import { buttonClass } from "@/components/ui/button";
 import { StatCard } from "@/components/ui/stat-card";
 import { ProgressRing } from "@/components/ui/progress-ring";
+import { BodyDiagram } from "@/components/body-diagram";
 import { computeStreak } from "@/lib/streak";
 
 const DAY = 86_400_000;
@@ -63,6 +64,10 @@ export default function HomePage() {
   const me = useQuery(api.users.me, {});
   const exercises = useQuery(api.exercises.list, {});
   const latestBodyWeight = useQuery(api.bodyEntries.latestWeight, {});
+  const latestBody = useQuery(api.bodyEntries.latest, {});
+  const checkins = useQuery(api.checkins.listForUser, {});
+  const logCheckin = useMutation(api.checkins.create);
+  const [recoveryNote, setRecoveryNote] = useState<string | null>(null);
 
   const [hasDraft, setHasDraft] = useState(false);
   useEffect(() => {
@@ -123,7 +128,15 @@ export default function HomePage() {
     0,
   );
   const weekTime = thisWeek.reduce((s, w) => s + (w.durationSec ?? 0), 0);
-  const streak = workouts ? computeStreak(workouts.map((w) => w.date)) : 0;
+  // Streak counts workouts AND recovery check-ins (rest/cardio/stretch).
+  const activeDates = [
+    ...(workouts ?? []).map((w) => w.date),
+    ...(checkins ?? []).map((c) => c.date),
+  ];
+  const streak = computeStreak(activeDates);
+  // Already trained or logged recovery today? Then hide the streak-saver card.
+  const todayStart = new Date().setHours(0, 0, 0, 0);
+  const activeToday = activeDates.some((d) => d >= todayStart);
 
   // Weekly activity — volume per day this week (Mon–Sun).
   const weekData = DAY_LABELS.map((label, i) => {
@@ -141,6 +154,16 @@ export default function HomePage() {
       : null;
 
   const loading = workouts === undefined;
+
+  async function logRecovery(type: "rest" | "cardio" | "stretching") {
+    setRecoveryNote(null);
+    try {
+      await logCheckin({ type });
+      setRecoveryNote("Logged — your streak is safe. 🔥");
+    } catch {
+      setRecoveryNote(null);
+    }
+  }
 
   return (
     <div className="container-page flex flex-col gap-6 py-8">
@@ -279,6 +302,52 @@ export default function HomePage() {
             </ResponsiveContainer>
           </div>
         </section>
+      </div>
+
+      {/* Body + recovery */}
+      <div className="grid gap-3 lg:grid-cols-3">
+        <div className={activeToday ? "lg:col-span-3" : "lg:col-span-2"}>
+          <BodyDiagram
+            weight={latestBody?.weight ?? null}
+            unit={unit}
+            measurements={latestBody?.measurements ?? null}
+          />
+        </div>
+        {!activeToday && (
+        <section className="flex flex-col gap-3 rounded-card border border-border bg-card p-5">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Flame weight="fill" className="size-4 text-accent-strong" />
+              Keep your streak
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Not lifting today? Log active recovery so your streak stays alive.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {(
+              [
+                { type: "rest", label: "Rest day" },
+                { type: "cardio", label: "Cardio" },
+                { type: "stretching", label: "Stretching" },
+              ] as const
+            ).map((r) => (
+              <button
+                key={r.type}
+                onClick={() => logRecovery(r.type)}
+                className="rounded-full border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:border-accent-strong/50 hover:bg-accent/5"
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          {recoveryNote && (
+            <p className="text-xs font-medium text-accent-strong">
+              {recoveryNote}
+            </p>
+          )}
+        </section>
+        )}
       </div>
 
       {/* Recent */}

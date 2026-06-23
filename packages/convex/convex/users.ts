@@ -154,8 +154,14 @@ export const setPreferences = mutation({
     weeklyGoal: v.optional(v.number()),
     restSeconds: v.optional(v.number()),
     bodyWeight: v.optional(v.number()),
+    remindExercise: v.optional(v.boolean()),
+    remindWeighIn: v.optional(v.boolean()),
+    remindRest: v.optional(v.boolean()),
   },
-  handler: async (ctx, { weeklyGoal, restSeconds, bodyWeight }) => {
+  handler: async (
+    ctx,
+    { weeklyGoal, restSeconds, bodyWeight, remindExercise, remindWeighIn, remindRest },
+  ) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     const user = await ctx.db
@@ -167,6 +173,9 @@ export const setPreferences = mutation({
       weeklyGoal?: number;
       restSeconds?: number;
       bodyWeight?: number;
+      remindExercise?: boolean;
+      remindWeighIn?: boolean;
+      remindRest?: boolean;
     } = {};
     if (weeklyGoal !== undefined) {
       patch.weeklyGoal = Math.min(14, Math.max(1, Math.round(weeklyGoal)));
@@ -177,6 +186,9 @@ export const setPreferences = mutation({
     if (bodyWeight !== undefined) {
       patch.bodyWeight = Math.max(0, round1(bodyWeight));
     }
+    if (remindExercise !== undefined) patch.remindExercise = remindExercise;
+    if (remindWeighIn !== undefined) patch.remindWeighIn = remindWeighIn;
+    if (remindRest !== undefined) patch.remindRest = remindRest;
     await ctx.db.patch(user._id, patch);
   },
 });

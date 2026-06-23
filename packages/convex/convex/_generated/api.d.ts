@@ -10,6 +10,7 @@
 
 import type * as billing from "../billing.js";
 import type * as bodyEntries from "../bodyEntries.js";
+import type * as checkins from "../checkins.js";
 import type * as crons from "../crons.js";
 import type * as exercises from "../exercises.js";
 import type * as exercisesSeed from "../exercisesSeed.js";
@@ -30,6 +31,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   billing: typeof billing;
   bodyEntries: typeof bodyEntries;
+  checkins: typeof checkins;
   crons: typeof crons;
   exercises: typeof exercises;
   exercisesSeed: typeof exercisesSeed;

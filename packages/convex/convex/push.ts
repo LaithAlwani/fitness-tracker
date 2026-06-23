@@ -100,6 +100,7 @@ export const scheduleRestDone = mutation({
   handler: async (ctx, { seconds }): Promise<string | null> => {
     const user = await getCurrentUser(ctx);
     if (!user) return null;
+    if (user.remindRest === false) return null; // opted out
     const subs = await ctx.db
       .query("pushSubscriptions")
       .withIndex("by_user", (q) => q.eq("userId", user._id))

@@ -49,6 +49,13 @@ export default function BodyPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editWeight, setEditWeight] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [editMeas, setEditMeas] = useState<Record<MeasKey, string>>({
+    waist: "",
+    chest: "",
+    arms: "",
+    hips: "",
+    thighs: "",
+  });
   const [editError, setEditError] = useState<string | null>(null);
 
   const [open, setOpen] = useState(false);
@@ -106,10 +113,23 @@ export default function BodyPage() {
     }
   }
 
-  function startEdit(id: string, w: number, n?: string) {
-    setEditingId(id);
-    setEditWeight(String(w));
-    setEditNotes(n ?? "");
+  function startEdit(e: {
+    _id: Id<"bodyEntries">;
+    weight: number;
+    notes?: string;
+    measurements?: Partial<Record<MeasKey, number>>;
+  }) {
+    setEditingId(e._id);
+    setEditWeight(String(e.weight));
+    setEditNotes(e.notes ?? "");
+    const m = e.measurements ?? {};
+    setEditMeas({
+      waist: m.waist != null ? String(m.waist) : "",
+      chest: m.chest != null ? String(m.chest) : "",
+      arms: m.arms != null ? String(m.arms) : "",
+      hips: m.hips != null ? String(m.hips) : "",
+      thighs: m.thighs != null ? String(m.thighs) : "",
+    });
     setEditError(null);
   }
 
@@ -121,7 +141,12 @@ export default function BodyPage() {
       return;
     }
     try {
-      await update({ entryId, weight: w, notes: editNotes });
+      const m: Partial<Record<MeasKey, number>> = {};
+      for (const k of MEAS_KEYS) {
+        const val = Number(editMeas[k]);
+        if (editMeas[k] && val > 0) m[k] = val;
+      }
+      await update({ entryId, weight: w, notes: editNotes, measurements: m });
       setEditingId(null);
     } catch (e) {
       setEditError(e instanceof Error ? e.message : "Could not save.");
@@ -340,6 +365,27 @@ export default function BodyPage() {
                       />
                     </label>
                   </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    {MEAS_KEYS.map((k) => (
+                      <label
+                        key={k}
+                        className="flex flex-col gap-1 text-xs capitalize text-muted-foreground"
+                      >
+                        {k} (in)
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.1"
+                          min="0"
+                          value={editMeas[k]}
+                          onChange={(ev) =>
+                            setEditMeas((m) => ({ ...m, [k]: ev.target.value }))
+                          }
+                          className={`h-11 ${inputBase}`}
+                        />
+                      </label>
+                    ))}
+                  </div>
                   {editError && (
                     <p className="mt-2 text-sm text-red-600">{editError}</p>
                   )}
@@ -383,7 +429,7 @@ export default function BodyPage() {
                       {shortDate(e.date)}
                     </span>
                     <button
-                      onClick={() => startEdit(e._id, e.weight, e.notes)}
+                      onClick={() => startEdit(e)}
                       aria-label="Edit entry"
                       className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >

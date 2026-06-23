@@ -25,6 +25,48 @@ function fmtRest(sec: number) {
   return s ? `${m}:${String(s).padStart(2, "0")}` : `${m} min`;
 }
 
+function Switch({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onClick}
+      className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors ${
+        on ? "bg-accent" : "bg-muted"
+      }`}
+    >
+      <span
+        className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${
+          on ? "translate-x-5" : "translate-x-0"
+        }`}
+      />
+    </button>
+  );
+}
+
+function ReminderRow({
+  title,
+  desc,
+  on,
+  onToggle,
+}: {
+  title: string;
+  desc: string;
+  on: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-xs text-muted-foreground">{desc}</p>
+      </div>
+      <Switch on={on} onClick={onToggle} />
+    </div>
+  );
+}
+
 function Stepper({
   value,
   onDec,
@@ -76,16 +118,30 @@ export default function SettingsPage() {
   // Training prefs — seeded from the server, updated optimistically.
   const [goal, setGoal] = useState(4);
   const [rest, setRest] = useState(90);
-  const [bw, setBw] = useState(0);
+  const [rem, setRem] = useState({
+    remindExercise: true,
+    remindWeighIn: true,
+    remindRest: true,
+  });
+  useEffect(() => {
+    if (!me) return;
+    setRem({
+      remindExercise: me.remindExercise !== false,
+      remindWeighIn: me.remindWeighIn !== false,
+      remindRest: me.remindRest !== false,
+    });
+  }, [me]);
+  function toggleReminder(key: keyof typeof rem) {
+    const v = !rem[key];
+    setRem((r) => ({ ...r, [key]: v }));
+    setPrefs({ [key]: v });
+  }
   useEffect(() => {
     if (me?.weeklyGoal) setGoal(me.weeklyGoal);
   }, [me?.weeklyGoal]);
   useEffect(() => {
     if (me?.restSeconds) setRest(me.restSeconds);
   }, [me?.restSeconds]);
-  useEffect(() => {
-    if (me?.bodyWeight) setBw(me.bodyWeight);
-  }, [me?.bodyWeight]);
   function changeGoal(n: number) {
     const v = Math.min(14, Math.max(1, n));
     setGoal(v);
@@ -95,11 +151,6 @@ export default function SettingsPage() {
     const v = Math.min(600, Math.max(15, n));
     setRest(v);
     setPrefs({ restSeconds: v });
-  }
-  function commitBw() {
-    const v = Math.max(0, Math.round(bw * 10) / 10);
-    setBw(v);
-    setPrefs({ bodyWeight: v });
   }
 
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -282,37 +333,39 @@ export default function SettingsPage() {
               onInc={() => changeRest(rest + 15)}
             />
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Body weight</p>
-              <p className="text-xs text-muted-foreground">
-                Adds your weight to bodyweight moves (pull-ups, dips…) so volume
-                and PRs reflect total load.
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.5"
-                value={bw || ""}
-                onChange={(e) => setBw(Number(e.target.value) || 0)}
-                onBlur={commitBw}
-                placeholder="0"
-                aria-label="Body weight"
-                className="h-9 w-20 rounded-full border border-border bg-background px-3 text-center text-sm font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-              <span className="text-sm font-medium uppercase text-muted-foreground">
-                {unit}
-              </span>
-            </div>
-          </div>
         </div>
       </section>
 
       {/* Push reminders */}
       <PushToggle />
+
+      {/* Reminders */}
+      <section className="rounded-card border border-border bg-card p-5">
+        <h2 className="font-medium">Reminders</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Choose which nudges you get (in-app bell + push, when enabled).
+        </p>
+        <div className="mt-4 flex flex-col gap-5">
+          <ReminderRow
+            title="Daily exercise"
+            desc="A nudge to train (or log recovery) if you've been inactive today."
+            on={rem.remindExercise}
+            onToggle={() => toggleReminder("remindExercise")}
+          />
+          <ReminderRow
+            title="Weekly weigh-in"
+            desc="A Monday reminder to log your body weight."
+            on={rem.remindWeighIn}
+            onToggle={() => toggleReminder("remindWeighIn")}
+          />
+          <ReminderRow
+            title="Rest timer done"
+            desc="Push when your rest timer reaches zero."
+            on={rem.remindRest}
+            onToggle={() => toggleReminder("remindRest")}
+          />
+        </div>
+      </section>
 
       {/* Account */}
       <section className="rounded-card border border-border bg-card p-5">

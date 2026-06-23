@@ -31,6 +31,26 @@ export const latestWeight = query({
   },
 });
 
+// Most recent full body entry (weight + measurements) — for the home diagram.
+export const latest = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) return null;
+    const last = await ctx.db
+      .query("bodyEntries")
+      .withIndex("by_user_date", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .first();
+    if (!last) return null;
+    return {
+      weight: last.weight,
+      measurements: last.measurements ?? null,
+      date: last.date,
+    };
+  },
+});
+
 export const create = mutation({
   args: {
     weight: v.number(),
@@ -71,18 +91,30 @@ export const update = mutation({
     entryId: v.id("bodyEntries"),
     weight: v.optional(v.number()),
     notes: v.optional(v.string()),
+    measurements: v.optional(measurements),
   },
-  handler: async (ctx, { entryId, weight, notes }) => {
+  handler: async (ctx, { entryId, weight, notes, measurements: m }) => {
     const user = await getCurrentUserOrThrow(ctx);
     const entry = await ctx.db.get(entryId);
     if (!entry || entry.userId !== user._id) throw new Error("Entry not found");
 
-    const patch: { weight?: number; notes?: string | undefined } = {};
+    const patch: {
+      weight?: number;
+      notes?: string | undefined;
+      measurements?: typeof m;
+    } = {};
     if (weight !== undefined) {
       if (!(weight > 0)) throw new Error("Enter a valid weight");
       patch.weight = weight;
     }
     if (notes !== undefined) patch.notes = notes.trim() || undefined;
+    if (m !== undefined) {
+      const cleaned: Record<string, number> = {};
+      for (const [k, val] of Object.entries(m)) {
+        if (typeof val === "number" && val > 0) cleaned[k] = val;
+      }
+      patch.measurements = Object.keys(cleaned).length ? cleaned : undefined;
+    }
     await ctx.db.patch(entryId, patch);
   },
 });

@@ -11,20 +11,39 @@ import {
   Barbell,
   Scales,
   ChartLineUp,
-  ClockCounterClockwise,
   Gear,
+  Storefront,
+  Heart,
   type Icon,
 } from "@phosphor-icons/react";
 import { NotificationBell } from "@/components/notification-bell";
 import { RestTimerProvider } from "@/components/rest-timer";
 
+const DONATE_URL =
+  process.env.NEXT_PUBLIC_DONATE_URL || "https://ko-fi.com/liftify";
+
 const NAV: { href: string; label: string; icon: Icon }[] = [
   { href: "/", label: "Home", icon: House },
   { href: "/workout/new", label: "Log", icon: Barbell },
-  { href: "/history", label: "History", icon: ClockCounterClockwise },
   { href: "/body", label: "Body", icon: Scales },
   { href: "/progress", label: "Progress", icon: ChartLineUp },
+  { href: "/shop", label: "Shop", icon: Storefront },
 ];
+
+function DonateButton({ className = "" }: { className?: string }) {
+  return (
+    <a
+      href={DONATE_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Support Liftify"
+      title="Support Liftify"
+      className={`flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/10 hover:text-accent-strong ${className}`}
+    >
+      <Heart weight="fill" className="size-5" />
+    </a>
+  );
+}
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -88,7 +107,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
             Liftify
           </Link>
-          <NotificationBell />
+          <div className="flex items-center gap-1">
+            <DonateButton />
+            <NotificationBell />
+          </div>
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 px-3 py-3">
@@ -141,6 +163,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             Liftify
           </Link>
           <div className="flex items-center gap-1">
+            <DonateButton />
             <NotificationBell />
             <Link
               href="/settings"

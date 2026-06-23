@@ -11,4 +11,11 @@ crons.weekly(
   internal.notifications.ensureWeeklyForAll,
 );
 
+// Daily "move today" nudge — late afternoon, for users still inactive that day.
+crons.daily(
+  "daily exercise reminder",
+  { hourUTC: 17, minuteUTC: 0 },
+  internal.notifications.ensureDailyForAll,
+);
+
 export default crons;

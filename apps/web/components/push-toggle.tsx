@@ -105,6 +105,17 @@ export function PushToggle() {
       });
       const keys = (sub.toJSON().keys ?? {}) as { p256dh: string; auth: string };
       await save({ endpoint: sub.endpoint, p256dh: keys.p256dh, auth: keys.auth });
+      // Confirm it works by sending an activation notification.
+      try {
+        const res = await sendTest({});
+        setNote(
+          res.configured && res.sent > 0
+            ? "Notifications activated — we just sent you one to confirm."
+            : "Notifications activated.",
+        );
+      } catch {
+        setNote("Notifications activated.");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not enable push.");
     } finally {
@@ -141,47 +152,13 @@ export function PushToggle() {
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         {enabled ? (
-          <>
-            <button
-              onClick={disable}
-              disabled={busy}
-              className="rounded-full border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
-            >
-              {busy ? "Working…" : "Turn off push"}
-            </button>
-            <button
-              onClick={async () => {
-                setError(null);
-                setNote(null);
-                try {
-                  const res = await sendTest({});
-                  if (!res.configured) {
-                    setError(
-                      "Push isn't set up on the server yet (missing VAPID keys on Convex).",
-                    );
-                  } else if (res.subscriptions === 0) {
-                    setError("No subscribed device — turn push off and on again.");
-                  } else if (res.sent === 0) {
-                    setError(
-                      "Your subscription expired. Turn push off and on again.",
-                    );
-                  } else {
-                    setNote(
-                      `Test sent to ${res.sent} device${res.sent === 1 ? "" : "s"} — check your notifications.`,
-                    );
-                  }
-                } catch (e) {
-                  setError(
-                    e instanceof Error ? e.message : "Could not send test.",
-                  );
-                }
-              }}
-              disabled={busy}
-              className="rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-strong disabled:opacity-50"
-            >
-              Send test
-            </button>
-          </>
+          <button
+            onClick={disable}
+            disabled={busy}
+            className="rounded-full border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-50"
+          >
+            {busy ? "Working…" : "Turn off push"}
+          </button>
         ) : (
           <button
             onClick={enable}

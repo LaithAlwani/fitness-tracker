@@ -68,7 +68,12 @@ export default function ProgressPage() {
   const workouts = useQuery(api.workouts.listForUser, { limit: 300 });
   const exercises = useQuery(api.exercises.list, {});
   const latestBodyWeight = useQuery(api.bodyEntries.latestWeight, {});
+  const checkins = useQuery(api.checkins.listForUser, {});
   const unit = me?.units ?? "lb";
+
+  const recoveryDays = new Set(
+    (checkins ?? []).map((c) => startOfDay(c.date)),
+  );
 
   // Fold body weight into bodyweight moves so volume / 1RM reflect total load.
   const bwNames = useMemo(
@@ -315,7 +320,7 @@ export default function ProgressPage() {
               Each square is a day you trained
             </p>
             <div className="mt-4">
-              <Heatmap values={dayValues} />
+              <Heatmap values={dayValues} recovery={recoveryDays} />
             </div>
           </section>
         </>
