@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "./providers";
 import { RegisterSW } from "@/components/register-sw";
+import { AppleSplash } from "@/components/apple-splash";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -64,6 +65,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       >
         <body className="min-h-full flex flex-col">
+          <AppleSplash />
           {/* Apply the saved text size before paint to avoid a flash. */}
           <script
             dangerouslySetInnerHTML={{

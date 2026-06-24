@@ -112,19 +112,38 @@ export const setUnits = mutation({
   },
 });
 
+// Record the device's UTC offset (minutes) so reminders fire in local time.
+export const setTimezone = mutation({
+  args: { tzOffset: v.number() },
+  handler: async (ctx, { tzOffset }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) return;
+    if (user.tzOffset !== tzOffset) await ctx.db.patch(user._id, { tzOffset });
+  },
+});
+
 // Update training preferences (weekly goal, rest length, bodyweight default).
 export const setPreferences = mutation({
   args: {
     weeklyGoal: v.optional(v.number()),
     restSeconds: v.optional(v.number()),
     bodyWeight: v.optional(v.number()),
+    reminderHour: v.optional(v.number()),
     remindExercise: v.optional(v.boolean()),
     remindWeighIn: v.optional(v.boolean()),
     remindRest: v.optional(v.boolean()),
   },
   handler: async (
     ctx,
-    { weeklyGoal, restSeconds, bodyWeight, remindExercise, remindWeighIn, remindRest },
+    {
+      weeklyGoal,
+      restSeconds,
+      bodyWeight,
+      reminderHour,
+      remindExercise,
+      remindWeighIn,
+      remindRest,
+    },
   ) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
@@ -137,12 +156,16 @@ export const setPreferences = mutation({
       weeklyGoal?: number;
       restSeconds?: number;
       bodyWeight?: number;
+      reminderHour?: number;
       remindExercise?: boolean;
       remindWeighIn?: boolean;
       remindRest?: boolean;
     } = {};
     if (weeklyGoal !== undefined) {
       patch.weeklyGoal = Math.min(14, Math.max(1, Math.round(weeklyGoal)));
+    }
+    if (reminderHour !== undefined) {
+      patch.reminderHour = Math.min(23, Math.max(0, Math.round(reminderHour)));
     }
     if (restSeconds !== undefined) {
       patch.restSeconds = Math.min(600, Math.max(15, Math.round(restSeconds)));

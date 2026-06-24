@@ -3,19 +3,12 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
-// Every Monday morning, drop a body-weight reminder for users who haven't
-// already weighed in this week.
-crons.weekly(
-  "weekly body-weight reminder",
-  { dayOfWeek: "monday", hourUTC: 14, minuteUTC: 0 },
-  internal.notifications.ensureWeeklyForAll,
-);
-
-// Daily "move today" nudge — late afternoon, for users still inactive that day.
-crons.daily(
-  "daily exercise reminder",
-  { hourUTC: 17, minuteUTC: 0 },
-  internal.notifications.ensureDailyForAll,
+// Runs every hour; the handler fires each user's reminders at their own local
+// reminder hour (daily nudge + weekly weigh-in on their local Monday).
+crons.hourly(
+  "reminders",
+  { minuteUTC: 0 },
+  internal.notifications.runReminders,
 );
 
 export default crons;

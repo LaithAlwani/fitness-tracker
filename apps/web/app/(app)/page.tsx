@@ -28,6 +28,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { CountUp } from "@/components/ui/count-up";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { BodyDiagram } from "@/components/body-diagram";
+import { Onboarding } from "@/components/onboarding";
 import { computeStreak } from "@/lib/streak";
 
 const DAY = 86_400_000;
@@ -104,7 +105,7 @@ export default function HomePage() {
     () =>
       new Set(
         (exercises ?? [])
-          .filter((e) => e.equipment === "body only")
+          .filter((e) => e.equipment === "body only" && e.mechanic === "compound")
           .map((e) => e.name.toLowerCase()),
       ),
     [exercises],
@@ -164,6 +165,12 @@ export default function HomePage() {
 
   return (
     <div className="container-page flex flex-col gap-6 py-8">
+      <Onboarding
+        enabled={workouts.length === 0}
+        defaultUnits={me.units}
+        defaultGoal={me.weeklyGoal}
+      />
+
       {prCelebration && prCelebration.prs.length > 0 && (
         <div className="relative overflow-hidden rounded-card border border-accent-strong/40 bg-accent/10 p-4">
           <button

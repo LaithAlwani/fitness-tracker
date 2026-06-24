@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useUser, useClerk, SignOutButton } from "@clerk/nextjs";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useConvex } from "convex/react";
 import { api } from "@liftify/convex";
 import {
   SignOut,
@@ -10,9 +10,33 @@ import {
   WarningCircle,
   Minus,
   Plus,
+  DownloadSimple,
 } from "@phosphor-icons/react";
 import { PushToggle } from "@/components/push-toggle";
 import { Button } from "@/components/ui/button";
+
+function toCsv(rows: (string | number)[][]) {
+  return rows
+    .map((r) =>
+      r
+        .map((cell) => {
+          const s = String(cell ?? "");
+          return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        })
+        .join(","),
+    )
+    .join("\n");
+}
+
+function downloadCsv(filename: string, text: string) {
+  const blob = new Blob([text], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const UNITS = ["lb", "kg"] as const;
 
@@ -21,6 +45,12 @@ function fmtRest(sec: number) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return s ? `${m}:${String(s).padStart(2, "0")}` : `${m} min`;
+}
+
+function fmtHour(h: number) {
+  const am = h < 12;
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:00 ${am ? "AM" : "PM"}`;
 }
 
 function Switch({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -109,8 +139,11 @@ export default function SettingsPage() {
   const setUnits = useMutation(api.users.setUnits);
   const setPrefs = useMutation(api.users.setPreferences);
   const deleteData = useMutation(api.users.deleteAccount);
+  const convex = useConvex();
   const { user } = useUser();
   const { signOut } = useClerk();
+
+  const [exporting, setExporting] = useState<"workouts" | "body" | null>(null);
 
   // Training prefs — seeded from the server, updated optimistically.
   const [goal, setGoal] = useState(4);
@@ -120,6 +153,15 @@ export default function SettingsPage() {
     remindWeighIn: true,
     remindRest: true,
   });
+  const [reminderHour, setReminderHour] = useState(18);
+  useEffect(() => {
+    if (me?.reminderHour !== undefined) setReminderHour(me.reminderHour);
+  }, [me?.reminderHour]);
+  function changeReminderHour(h: number) {
+    const v = ((h % 24) + 24) % 24;
+    setReminderHour(v);
+    setPrefs({ reminderHour: v });
+  }
   useEffect(() => {
     if (!me) return;
     setRem({
@@ -189,6 +231,56 @@ export default function SettingsPage() {
   }
 
   const unit = me?.units ?? "lb";
+
+  async function exportWorkouts() {
+    setExporting("workouts");
+    try {
+      const ws = await convex.query(api.workouts.listForUser, { limit: 5000 });
+      const rows: (string | number)[][] = [
+        ["date", "workout", "exercise", "set", "reps", "weight", "unit"],
+      ];
+      for (const w of ws) {
+        const date = new Date(w.date).toISOString().slice(0, 10);
+        for (const ex of w.exercises) {
+          ex.sets.forEach((s, i) =>
+            rows.push([date, w.name, ex.name, i + 1, s.reps, s.weight, unit]),
+          );
+        }
+      }
+      downloadCsv("liftify-workouts.csv", toCsv(rows));
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function exportBody() {
+    setExporting("body");
+    try {
+      const es = await convex.query(api.bodyEntries.listForUser, {
+        limit: 5000,
+      });
+      const rows: (string | number)[][] = [
+        ["date", "weight", "unit", "waist", "chest", "arms", "hips", "thighs", "notes"],
+      ];
+      for (const e of es) {
+        const m = e.measurements ?? {};
+        rows.push([
+          new Date(e.date).toISOString().slice(0, 10),
+          e.weight,
+          unit,
+          m.waist ?? "",
+          m.chest ?? "",
+          m.arms ?? "",
+          m.hips ?? "",
+          m.thighs ?? "",
+          e.notes ?? "",
+        ]);
+      }
+      downloadCsv("liftify-body.csv", toCsv(rows));
+    } finally {
+      setExporting(null);
+    }
+  }
 
   const name =
     [me?.firstName, me?.lastName].filter(Boolean).join(" ") ||
@@ -292,6 +384,19 @@ export default function SettingsPage() {
           Choose which nudges you get (in-app bell + push, when enabled).
         </p>
         <div className="mt-4 flex flex-col gap-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Reminder time</p>
+              <p className="text-xs text-muted-foreground">
+                When daily &amp; weekly reminders are sent — your local time.
+              </p>
+            </div>
+            <Stepper
+              value={fmtHour(reminderHour)}
+              onDec={() => changeReminderHour(reminderHour - 1)}
+              onInc={() => changeReminderHour(reminderHour + 1)}
+            />
+          </div>
           <ReminderRow
             title="Daily exercise"
             desc="A nudge to train (or log recovery) if you've been inactive today."
@@ -326,6 +431,32 @@ export default function SettingsPage() {
             <dd className="truncate font-medium">{email}</dd>
           </div>
         </dl>
+      </section>
+
+      {/* Export data */}
+      <section className="rounded-card border border-border bg-card p-5">
+        <h2 className="font-medium">Export your data</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Download a CSV of everything you&apos;ve logged.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            onClick={exportWorkouts}
+            disabled={exporting !== null}
+          >
+            <DownloadSimple className="size-4" />
+            {exporting === "workouts" ? "Exporting…" : "Workouts CSV"}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={exportBody}
+            disabled={exporting !== null}
+          >
+            <DownloadSimple className="size-4" />
+            {exporting === "body" ? "Exporting…" : "Body log CSV"}
+          </Button>
+        </div>
       </section>
 
       {/* Sign out */}

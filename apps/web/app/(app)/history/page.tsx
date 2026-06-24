@@ -47,14 +47,7 @@ export default function HistoryPage() {
       <h1 className="text-3xl font-semibold tracking-tighter">History</h1>
 
       {workouts === undefined ? (
-        <div className="flex flex-col gap-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-16 animate-pulse rounded-xl border border-border bg-muted"
-            />
-          ))}
-        </div>
+        <HistorySkeleton />
       ) : workouts.length === 0 ? (
         <div className="rounded-card border border-dashed border-border p-8 text-center text-muted-foreground">
           No workouts yet.{" "}
@@ -116,6 +109,24 @@ export default function HistoryPage() {
           </section>
         ))
       )}
+    </div>
+  );
+}
+
+function HistorySkeleton() {
+  return (
+    <div className="flex animate-pulse flex-col gap-6">
+      {Array.from({ length: 2 }).map((_, g) => (
+        <section key={g} className="flex flex-col gap-2">
+          <div className="h-4 w-28 rounded bg-muted" />
+          {Array.from({ length: g === 0 ? 4 : 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-[68px] rounded-xl border border-border bg-muted"
+            />
+          ))}
+        </section>
+      ))}
     </div>
   );
 }

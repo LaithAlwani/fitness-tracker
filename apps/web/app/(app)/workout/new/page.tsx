@@ -291,7 +291,7 @@ function LogWorkout() {
     () =>
       new Set(
         (allExercises ?? [])
-          .filter((e) => e.equipment === "body only")
+          .filter((e) => e.equipment === "body only" && e.mechanic === "compound")
           .map((e) => e.name.toLowerCase()),
       ),
     [allExercises],

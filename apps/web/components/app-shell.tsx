@@ -54,7 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useUser();
   const { isAuthenticated } = useConvexAuth();
   const ensureUser = useMutation(api.users.getOrCreateCurrentUser);
-  const ensureWeekly = useMutation(api.notifications.ensureWeekly);
+  const setTimezone = useMutation(api.users.setTimezone);
 
   const initial = (
     user?.firstName?.[0] ??
@@ -65,9 +65,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isAuthenticated) return;
     ensureUser()
-      .then(() => ensureWeekly())
+      .then(() => setTimezone({ tzOffset: new Date().getTimezoneOffset() }))
       .catch(() => {});
-  }, [isAuthenticated, ensureUser, ensureWeekly]);
+  }, [isAuthenticated, ensureUser, setTimezone]);
 
   const avatar = user?.imageUrl ? (
     <span className="size-8 overflow-hidden rounded-full border border-border">

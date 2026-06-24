@@ -14,6 +14,7 @@ export const list = query({
         name: e.name,
         muscleGroup: e.muscleGroup,
         equipment: e.equipment,
+        mechanic: e.mechanic,
         image: e.images?.[0],
         hasDetail: (e.images?.length ?? 0) > 0 || (e.instructions?.length ?? 0) > 0,
       }))
