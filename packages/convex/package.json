@@ -23,7 +23,6 @@
   "dependencies": {
     "@liftify/shared": "*",
     "convex": "^1.17.4",
-    "stripe": "^17.5.0",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

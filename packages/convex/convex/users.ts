@@ -1,30 +1,7 @@
 import { v } from "convex/values";
 
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { getCurrentUser, getCurrentUserOrThrow } from "./model";
-
-// One-time migration: strip legacy billing fields off every user doc so they
-// can be removed from the schema. Run: convex run users:dropBillingFields [--prod]
-export const dropBillingFields = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const users = await ctx.db.query("users").collect();
-    for (const u of users) {
-      await ctx.db.patch(u._id, {
-        subscriptionStatus: undefined,
-        trialEndsAt: undefined,
-        stripeCustomerId: undefined,
-        stripeSubscriptionId: undefined,
-        currentPeriodEnd: undefined,
-        cancelAtPeriodEnd: undefined,
-        isFounder: undefined,
-        billingInterval: undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
-    }
-    return { migrated: users.length };
-  },
-});
 
 // Called on first authenticated load. Creates the user row if missing and keeps
 // the profile in sync with Clerk. New users start a no-card 30-day trial so the
