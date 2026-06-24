@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
-    apple: "/logo.png", // iOS home-screen + splash icon (PNG required)
+    apple: "/apple-icon.png", // iOS home-screen + splash icon (logo on dark)
   },
   appleWebApp: {
     capable: true,
