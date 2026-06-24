@@ -90,9 +90,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             href="/"
             className="flex items-center gap-2 font-semibold tracking-tight"
           >
-            <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-              <Barbell weight="bold" className="size-5" />
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.webp" alt="" className="size-8 rounded-lg" />
             Liftify
           </Link>
           <div className="flex items-center gap-1">
@@ -145,9 +144,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             href="/"
             className="flex items-center gap-2 font-semibold tracking-tight"
           >
-            <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-              <Barbell weight="bold" className="size-5" />
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.webp" alt="" className="size-8 rounded-lg" />
             Liftify
           </Link>
           <div className="flex items-center gap-1">

@@ -143,7 +143,9 @@ function LogWorkout() {
     } catch {
       /* ignore */
     }
-    setTimer(restored ?? { base: 0, runningSince: Date.now() });
+    // Only resume a clock the user already started — otherwise the session
+    // hasn't begun yet (they tap "Start workout" to start the timer).
+    if (restored) setTimer(restored);
     loaded.current = true;
   }, [isEditing, repeatId]);
 
@@ -205,7 +207,6 @@ function LogWorkout() {
         })),
       })),
     );
-    setTimer({ base: 0, runningSince: Date.now() });
     repeatLoaded.current = true;
   }, [repeatId, isEditing, existingWorkout]);
 
@@ -226,7 +227,17 @@ function LogWorkout() {
           ? Math.max(0, tick - timer.runningSince)
           : 0);
   const elapsedSec = elapsedMs === null ? null : Math.floor(elapsedMs / 1000);
+  const started = timer !== null; // the session clock has been started
 
+  function startWorkout() {
+    setTimer({ base: 0, runningSince: Date.now() });
+    // Open the first exercise's sets and scroll to it.
+    const first = entries[0];
+    if (first) {
+      setExpanded(new Set([first.id]));
+      setScrollTarget(first.id);
+    }
+  }
   function pauseTimer() {
     setTimer((t) =>
       t && t.runningSince !== null
@@ -327,7 +338,7 @@ function LogWorkout() {
       (e) => e.name.toLowerCase() === exName.toLowerCase(),
     );
     if (existing) {
-      setExpanded(new Set([existing.id]));
+      if (started) setExpanded(new Set([existing.id]));
       setScrollTarget(existing.id);
       return;
     }
@@ -339,10 +350,12 @@ function LogWorkout() {
       ...prev,
       { id, name: exName, sets: [{ id: uid(), reps: "", weight, done: false }] },
     ]);
-    setExpanded(new Set([id])); // collapse the others, open the new one
+    // Before the workout starts, cards stay collapsed (planning only).
+    if (started) setExpanded(new Set([id]));
     setScrollTarget(id);
   }
   function toggleExpanded(id: string) {
+    if (!started) return; // can't open sets until the workout is started
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -603,7 +616,7 @@ function LogWorkout() {
                     ) : null}
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate font-medium">{entry.name}</span>
-                      {!isOpen && (
+                      {!isOpen && started && (
                         <span className="text-sm text-muted-foreground">
                           {setCount} {setCount === 1 ? "set" : "sets"} ·{" "}
                           {totalReps} {totalReps === 1 ? "rep" : "reps"}
@@ -622,23 +635,34 @@ function LogWorkout() {
                       <Info className="size-5" />
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => toggleExpanded(entry.id)}
-                    aria-label={isOpen ? "Collapse exercise" : "Expand exercise"}
-                    aria-expanded={isOpen}
-                    className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <CaretDown
-                      className={`size-5 transition-transform ${
-                        isOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
+                  {started ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(entry.id)}
+                      aria-label={isOpen ? "Collapse exercise" : "Expand exercise"}
+                      aria-expanded={isOpen}
+                      className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <CaretDown
+                        className={`size-5 transition-transform ${
+                          isOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                  ) : (
+                    <IconButton
+                      variant="danger"
+                      onClick={() => removeExercise(entry.id)}
+                      aria-label={`Remove ${entry.name}`}
+                      title="Remove exercise"
+                    >
+                      <Trash className="size-4" />
+                    </IconButton>
+                  )}
                 </div>
 
-                {/* Sets */}
-                {isOpen && (
+                {/* Sets — only once the workout has started */}
+                {started && isOpen && (
                 <div className="mt-3 flex flex-col gap-2">
                   <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
                     <span className="w-8">Set</span>
@@ -723,8 +747,10 @@ function LogWorkout() {
                       <Trash className="size-4" />
                     </IconButton>
                     {(() => {
-                      const lastSet = entry.sets[entry.sets.length - 1];
-                      if (!lastSet || lastSet.done) {
+                      // Finish the FIRST still-open set; stay on "Finish set"
+                      // until every set is done, then offer "Add set".
+                      const open = entry.sets.find((s) => !s.done);
+                      if (!open) {
                         return (
                           <button
                             onClick={() => addSet(entry.id)}
@@ -737,10 +763,10 @@ function LogWorkout() {
                       }
                       return (
                         <button
-                          onClick={() => setSetDone(entry.id, lastSet.id, true)}
-                          disabled={!canFinishSet(lastSet)}
+                          onClick={() => setSetDone(entry.id, open.id, true)}
+                          disabled={!canFinishSet(open)}
                           title={
-                            canFinishSet(lastSet) ? undefined : "Enter reps first"
+                            canFinishSet(open) ? undefined : "Enter reps first"
                           }
                           className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-accent"
                         >
@@ -769,15 +795,35 @@ function LogWorkout() {
         Add exercise
       </button>
 
-      {/* Finish workout */}
-      <Button
-        onClick={requestFinish}
-        disabled={saving || entries.length === 0}
-        className="w-full"
-      >
-        <Check weight="bold" className="size-4" />
-        {isEditing ? "Save workout" : "Finish workout"}
-      </Button>
+      {/* Start the session, then finish it (edit mode just saves) */}
+      {isEditing ? (
+        <Button
+          onClick={requestFinish}
+          disabled={saving || entries.length === 0}
+          className="w-full"
+        >
+          <Check weight="bold" className="size-4" />
+          Save workout
+        </Button>
+      ) : !started ? (
+        <Button
+          onClick={startWorkout}
+          disabled={entries.length === 0}
+          className="w-full"
+        >
+          <Play weight="fill" className="size-4" />
+          Start workout
+        </Button>
+      ) : (
+        <Button
+          onClick={requestFinish}
+          disabled={saving || entries.length === 0}
+          className="w-full"
+        >
+          <Check weight="bold" className="size-4" />
+          Finish workout
+        </Button>
+      )}
 
       {!isEditing && (
         <Button

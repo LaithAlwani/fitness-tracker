@@ -20,8 +20,9 @@ export const metadata: Metadata = {
   description: "Log workouts in seconds and watch your progress over time.",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/icon-192.png",
-    apple: "/apple-touch-icon.png",
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/logo.png", // iOS home-screen + splash icon (PNG required)
   },
   appleWebApp: {
     capable: true,

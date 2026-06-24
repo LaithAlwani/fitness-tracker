@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Barbell, Flame, ChartLineUp, Lightning } from "@phosphor-icons/react";
+import { Flame, ChartLineUp, Lightning } from "@phosphor-icons/react";
 
 const PERKS = [
   { icon: Lightning, text: "Log a full session in under 30 seconds" },
@@ -31,9 +31,8 @@ export default function AuthLayout({
           href="/"
           className="relative flex items-center gap-2 text-lg font-semibold tracking-tight"
         >
-          <span className="flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-            <Barbell weight="bold" className="size-5" />
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.webp" alt="" className="size-9 rounded-lg" />
           Liftify
         </Link>
 

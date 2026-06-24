@@ -56,6 +56,12 @@
   .container-page { padding-inline: 2rem; }
 }
 
+/* Cover the iOS safe-area / overscroll region (uses the root background) so no
+   white strip shows below the bottom nav. */
+html {
+  background: var(--background);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
