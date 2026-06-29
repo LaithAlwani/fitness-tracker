@@ -65,7 +65,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isAuthenticated) return;
     ensureUser()
-      .then(() => setTimezone({ tzOffset: new Date().getTimezoneOffset() }))
+      .then(() =>
+        setTimezone({
+          // IANA zone keeps reminders DST-correct; offset is a fallback.
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          tzOffset: new Date().getTimezoneOffset(),
+        }),
+      )
       .catch(() => {});
   }, [isAuthenticated, ensureUser, setTimezone]);
 

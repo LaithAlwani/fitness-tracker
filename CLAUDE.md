@@ -1,119 +1,109 @@
 # CLAUDE.md
 
-> **This file is the source of truth for project rules.** Claude Code auto-loads it every session. Update it at the end of every phase with anything genuinely persistent (new conventions, file-structure additions, gotchas). Keep entries terse and rule-shaped — not a log.
+> **This file is the source of truth for project rules.** Claude Code auto-loads it every session. Keep entries terse and rule-shaped — not a log. The full plan lives in `PLAN.md` (repo root) — read it before non-trivial decisions.
 
 ---
 
 ## Project Context
 
-**Mission:** Mobile-first fitness tracker (iOS + Android via Expo / React Native) for **weightlifting** with manual cardio + manual bodyweight tracking and Duolingo-style gamification (XP, levels, achievements, weekly quests).
+**Mission:** **Liftify** — a mobile-first **web PWA** for fast **weightlifting** tracking with manual body-weight/measurement tracking. The whole product is deliberately tiny: *"Track workouts fast and see progress over time."* Bar for shippable = a new user logs their first workout in **under 30 seconds**, zero onboarding.
 
-**Plan file:** `C:\Users\laith\.claude\plans\i-want-to-create-inherited-brooks.md` — full implementation plan with phases, schema, gamification design, and store-launch checklist. Read it before making non-trivial decisions.
+**Monetization:** **Free for now** — no subscription, no paywall, no Stripe. Every authenticated user has full access. Passive monetization only: a **Donate** link (Ko-fi) and a **Shop** page (Amazon Associates affiliate). A **paid "Liftify AI" tier is a future phase** (AI suggestions / NL logging / insights) — that's when billing gets wired. Do **not** build billing or gate features behind a subscription yet. See `PLAN.md` §5.
 
-**Currently working on:** Phase 9 (Polish — local notifications, daily reminder settings, empty-state polish). Last sign-off: **v0.9** (Phase 8 — gamification engine: XP/levels, 14 achievements, 12 weekly quests, dashboard rebuild, celebration overlay).
+> **History:** this repo began as an Expo / React Native monorepo with Duolingo-style gamification (XP, levels, achievements, quests). That app was **abandoned and replaced** by this Next.js web PWA. Gamification is **removed**. If you find references to Expo, NativeWind, `apps/mobile`, XP, or subscriptions, they are stale — treat them as bugs/cleanup, not as the design.
+
+**Two products, two repos:**
+- **`liftify.com`** → marketing site (separate repo — the local `corevex` folder, pending rename).
+- **`app.liftify.com`** → the PWA (**this** repo, root dir `apps/web`).
 
 ### Stack
 
-- **Expo SDK 52+** with **Expo Router** (file-based routing)
-- **TypeScript** strict everywhere
-- **NativeWind 4** (Tailwind for RN — use `className=`, not `StyleSheet.create`)
-- **Clerk** auth via `@clerk/clerk-expo` + `expo-secure-store` token cache
-- **Convex** database via `convex/react`
-- **Reanimated 3** + **moti** for animations
-- **react-native-confetti-cannon** for celebrations
-- **expo-haptics** + **expo-notifications**
-- **Victory Native XL** (+ `@shopify/react-native-skia`) for charts
-- **pnpm workspaces + Turborepo** monorepo
-- **react-hook-form** + **zod** for forms
+- **Next.js 16** App Router + **React 19**, **TypeScript** strict everywhere.
+  > ⚠️ This is a **customized Next.js 16** ("NOT the Next.js you know" per `AGENTS.md`). Before writing Next.js code, read the relevant guide in `node_modules/next/dist/docs/` (App Router docs under `01-app/`).
+- **Tailwind v4** — tokens via `@theme inline` in `app/globals.css`; **no `tailwind.config.*`**. Shared `.container-page` helper.
+- **Clerk** auth via `@clerk/nextjs` (`ClerkProvider` in the root layout).
+- **Convex** database via `convex/react` + `ConvexProviderWithClerk`.
+- **Web Push** (VAPID) + a minimal online-first **service worker** (`apps/web/public/sw.js`).
+- **@phosphor-icons/react** for icons. **Geist / Geist Mono** via `next/font/google`.
+- **npm workspaces + Turborepo** monorepo. Workspace packages scoped **`@liftify/*`**.
 
 ### Monorepo layout
 
 ```
 fitness-tracker/
 ├── apps/
-│   └── mobile/                  Expo app (only app for v1)
-│       ├── app/                 Expo Router routes
-│       │   ├── (auth)/          sign-in, sign-up, verify-email, forgot/reset-password
-│       │   └── (app)/           protected routes incl. (tabs)/
-│       ├── components/          UI: workout/, plans/, charts/, gamification/, ui/, auth/
-│       └── lib/                 mobile-only: haptics, notifications, tokenCache
+│   └── web/                     Next.js 16 PWA (@liftify/web) — the only app
+│       ├── app/
+│       │   ├── (auth)/          sign-in, sign-up
+│       │   ├── (app)/           home, workout/new, workout/[id], history, progress, body, shop, settings
+│       │   ├── api/             route handlers (e.g. delete-account)
+│       │   ├── layout.tsx       ClerkProvider + Providers + service-worker registration
+│       │   ├── providers.tsx    ConvexProviderWithClerk
+│       │   └── manifest.ts      PWA manifest
+│       ├── components/          ui/ (Button, Card, …) + app-shell, rest-timer, notification-bell,
+│       │                        plate-calculator, body-diagram, onboarding, push-toggle, …
+│       ├── lib/                 web-only helpers: streak.ts, prs.ts, shop.ts
+│       └── public/              sw.js, icons, logo
 ├── packages/
-│   ├── convex/                  Convex backend (@fitness/convex) — single deployment shared by all future apps
-│   ├── shared/                  Pure TS (@fitness/shared) — XP rules, achievements, quests, PRs, units, format
-│   └── tsconfig/                Shared tsconfig presets
-└── (root) pnpm-workspace.yaml, turbo.json, package.json, tsconfig.json
+│   ├── convex/                  @liftify/convex — backend (7 tables; see schema.ts)
+│   ├── shared/                  @liftify/shared — pure TS (units, prs, exercises)
+│   └── tsconfig/                shared tsconfig presets
+└── (root) package.json (npm workspaces), turbo.json, tsconfig.json, PLAN.md, DEPLOY.md
 ```
 
-> **Overrides** rule #12 below: this project uses the monorepo layout above, not `src/app/`. The 15 code-style rules still apply within each workspace.
+### Backend (Convex) — 7 tables, free app
+
+`users` (profile + reminder prefs, **no billing fields**), `exercises` (seeded read-only library, enriched from the public-domain **Free Exercise DB** — muscles, equipment, instructions, images), `workouts` (per-set `{reps, weight}` arrays + `durationSec`), `checkins` (rest/cardio/stretching active-recovery — feeds streaks), `bodyEntries` (weight + optional measurements), `notifications` (in-app), `pushSubscriptions` (Web Push). `convex/http.ts` is an **empty router** — a placeholder for a future Stripe webhook; there is none today.
 
 ### Workspace dependency rules
 
-- `apps/mobile` → depends on `@fitness/shared`, `@fitness/convex` (workspace:*).
-- `@fitness/convex` → depends on `@fitness/shared`. Convex mutations evaluate XP/achievements/quests using the **same** `@fitness/shared` predicates the client uses.
-- `@fitness/shared` → **pure TypeScript only**. No imports of `react`, `react-native`, `expo-*`, or any DOM/native module. Anything that breaks this is a bug.
+- `apps/web` → depends on `@liftify/shared`, `@liftify/convex`.
+- `@liftify/convex` → depends on `@liftify/shared` (mutations evaluate the same predicates the client uses).
+- `@liftify/shared` → **pure TypeScript only**. No `react`, `next`, or any DOM/native imports. Anything that breaks this is a bug.
+  > Cleanup note: `shared` still ships legacy gamification modules (`xp.ts`, `achievements.ts`, `quests.ts`) from the old app. They are **unused** by the current web app/backend — don't build on them; they're candidates for deletion.
 
 ### Conventions specific to this project
 
-- **Imports**: Convex API via `import { api } from "@fitness/convex/dist/_generated/api"`. Shared lib via `import { xpForLevel } from "@fitness/shared"`.
-- **Auth gate**: `apps/mobile/app/(app)/_layout.tsx` checks `useAuth().isSignedIn` and redirects. RN has no SSR/middleware layer.
-- **Styling**: NativeWind `className=`. Don't use `StyleSheet.create` unless required by a library.
-- **Forms**: `react-hook-form` + `zod` resolver. Inline error rendering, large tap targets, KeyboardAvoidingView.
-- **Haptics**: Wrap `expo-haptics` through `apps/mobile/lib/haptics.ts` — single import surface, easy to mute later.
-- **Phase tagging**: Each phase ends with a `v0.X` git tag (`v0.1` after Phase 0, `v0.2` after Phase 1, etc.) so we can roll back cleanly.
+- **Imports**: Convex API via `import { api } from "@liftify/convex"`. Shared lib via `import { convertWeight } from "@liftify/shared"`.
+- **Auth**: handled at the provider level — `ClerkProvider` (root layout) + `ConvexProviderWithClerk` (`app/providers.tsx`). `AppShell` calls `users.getOrCreateCurrentUser` on first authenticated load. There is currently **no `middleware.ts`**; if you add server-side route protection, add one (and update `DEPLOY.md`).
+- **Access is auth-only**: the app is free, so `users.accessState` just reports sign-in state. No subscription checks, no paywall redirects.
+- **Styling**: Tailwind v4 utility classes driven by the `@theme inline` tokens in `globals.css`. Don't add a `tailwind.config.*`.
+- **Icons**: `@phosphor-icons/react`.
 
 ### Authoritative commands
 
 | Action | Command |
 |---|---|
-| Run mobile dev server | `pnpm --filter @fitness/mobile exec expo start` |
-| Run Convex dev (codegen + watch) | `pnpm --filter @fitness/convex exec convex dev` |
-| Run both via Turbo | `pnpm dev` |
-| Type check all workspaces | `pnpm typecheck` |
-| Test shared package | `pnpm --filter @fitness/shared test` |
-| Deploy Convex prod | `pnpm --filter @fitness/convex exec convex deploy` |
-| EAS preview build | `pnpm --filter @fitness/mobile exec eas build --profile preview` |
+| Run the web app (dev) | `npm run web` |
+| Run Convex dev (codegen + watch) | `npm run convex:dev` |
+| Run everything via Turbo | `npm run dev` |
+| Type check all workspaces | `npm run typecheck` |
+| Lint all workspaces | `npm run lint` |
+| Test (shared) | `npm run test` |
+| Deploy Convex prod | `npm run convex:deploy` |
 
-### Hard "don't"s for v1 (deferred, not forgotten)
+Deploy runbook: see `DEPLOY.md` (two Vercel projects + one Convex prod deployment).
 
-- **No HealthKit / Health Connect code.** Deferred to v1.1 (Phase 12). Schema is forward-compatible via `source` + `externalId` fields on `cardioLogs` and `bodyMetrics`.
-- **No Apple Watch code.** Deferred to v2 (Phase 13).
-- **No web app code.** Deferred (Phase 13+). When added, slots in as `apps/web/` with zero refactor of `packages/*`.
-- **No streaks**, **no leaderboards**, **no curated plan templates**, **no RPE/notes per set**, **no social features** in v1.
-- **No shared logic in `apps/mobile/lib/`** — anything pure TS belongs in `packages/shared/`.
+### Hard "don't"s (deferred, not forgotten)
+
+- **No billing / Stripe / paywall yet.** The app is free. Billing arrives with the paid AI tier (`PLAN.md` §5). Schema + `http.ts` are left forward-compatible for it.
+- **No gamification.** XP/levels/achievements/quests were removed — don't reintroduce them.
+- **No shared logic in `apps/web/lib/`** — anything pure TS that the backend also needs belongs in `packages/shared/`.
+- **No HealthKit / Google Fit, no offline writes, no workout plans/templates** in this version.
+- **Don't delete `packages/convex/convex/_generated`** — it's committed so Vercel can build the app without a Convex codegen step.
 - **No `--no-verify`, `--force` git pushes, or destructive resets** without explicit user authorization.
 
-### Phase workflow (sign-off gates)
+### Environment variables
 
-Each phase produces a working slice. The user manually verifies on their phone via Expo Go before the next phase begins.
-
-1. Implement the phase's scope.
-2. `pnpm dev` from repo root → user reloads on phone via Expo Go.
-3. User walks through the **Verify** checklist for that phase (in the plan).
-4. Fix issues. Re-verify.
-5. Tag `v0.X` commit.
-6. Update this file (CLAUDE.md): bump "Currently working on" pointer, append any persistent gotchas/conventions discovered.
-7. Move to the next phase.
-
-### External services to set up (one-time, requires user action)
-
-1. **Clerk** — sign up at clerk.com, create an application. **Enable First Name + Last Name as required sign-up fields** (Configure → Email, Phone, Username → Personal information). **Enable Google as an SSO connection** (Configure → SSO Connections → Add → Google → use Clerk's dev credentials). Note publishable key (`pk_test_...`) and JWT issuer URL.
-2. **Convex** — sign up at convex.dev. `pnpm dlx convex dev` (run in `packages/convex/`) opens browser, provisions dev deployment.
-3. **Expo Go** — install from App Store / Play Store on the user's phone.
-4. (Before Phase 10) **Apple Developer Program** ($99/yr) and **Google Play Console** ($25 one-time). Identity verification ~24h.
-
-Environment variables (Expo bundles `EXPO_PUBLIC_*`):
-- `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`
-- `EXPO_PUBLIC_CONVEX_URL`
-
-Stored in `apps/mobile/.env.local` (git-ignored) for dev. Stored as EAS secrets for prod builds.
+App (Vercel / `apps/web/.env.local`): `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_DONATE_URL`. Convex: `CLERK_JWT_ISSUER_DOMAIN` + VAPID keys for Web Push. (Future Stripe keys live on Convex prod only — see `DEPLOY.md`.)
 
 ### Gotchas (append as discovered)
 
-- **pnpm + Expo node_modules layout.** The repo root `.npmrc` sets `node-linker=hoisted` because Metro's resolver cannot navigate pnpm's default isolated/symlinked layout — NativeWind imports `react-native-css-interop/jsx-runtime` and Reanimated worklets need transitive deps Metro can find directly. Don't remove that .npmrc. If you ever see `Unable to resolve module react-native-css-interop` or similar transitive-resolution errors, re-check the root .npmrc and that all `node_modules/` are wiped + reinstalled.
-- **Stale Metro on port 8081.** Closing a terminal mid-`expo start` on Windows often leaves an orphaned Node process holding 8081. If you get "Port 8081 is being used", run `Get-NetTCPConnection -LocalPort 8081 | Select OwningProcess` then `Stop-Process -Id <pid> -Force`. Or pass `--port 8082` to expo start.
-- **`&apos;` only works in JSX text, not in JS strings.** React/JSX decodes HTML entities inside `<Text>can&apos;t</Text>` automatically. But `Alert.alert("can&apos;t")` (and any other string passed to a native API or template literal) shows the entity literally. Always use a real apostrophe `'` in JS strings; the `react/no-unescaped-entities` lint rule only flags JSX text, not strings.
-- **NativeWind dynamic className + reactive state = re-render crash.** When a state value (e.g. user prefs from Convex) flips and triggers a re-render of an element with a *conditional* template-literal `className` (`` `${base} ${active ? "bg-white" : ""}` ``), `react-native-css-interop`'s `printUpgradeWarning` → `stringify` chain can throw, surfacing as a `getKey` error in `NavigationStateContext.js`. Switch the dynamic element to plain `style={...}` from `StyleSheet.create({...})` for the active/inactive variants. Static NativeWind classes are fine; only interpolated conditional classes that flip on reactive data are the trigger. Affected component so far: `(tabs)/profile.tsx` segmented kg/lb toggle.
-- **NativeWind opacity modifier `/N` doesn't work on custom palette colors.** `dark:bg-brand-950/30` silently fails to apply (the `bg-brand-950/30` style is dropped, falling back to whatever non-dark variant is set — often a bright color → looks like a popup in dark mode). Built-in Tailwind palette colors (`bg-neutral-900/30`) are fine. For custom colors defined in `tailwind.config.js`, use a fully opaque shade (`dark:bg-brand-950` or pick a different shade like `dark:bg-neutral-900` with a brand-colored border). Caught when the dashboard's "Recent achievements" card was rendering with `bg-brand-50` in dark mode because the `dark:bg-brand-950/30` variant didn't apply.
+- **Customized Next.js 16.** Don't assume stock Next.js behavior — read `node_modules/next/dist/docs/` first.
+- **Tailwind v4, no config file.** Design tokens are defined in `app/globals.css` via `@theme inline`. Editing a "theme color" means editing that block, not a `tailwind.config.js`.
+- **Committed Convex `_generated`.** Vercel builds `apps/web` without running Convex codegen, so the generated API types are committed. Run `npm run convex:deploy` to keep prod functions in sync after schema/function changes.
+- **Placeholder Convex URL.** `app/providers.tsx` falls back to `https://placeholder.convex.cloud` when `NEXT_PUBLIC_CONVEX_URL` is unset so `next build` never crashes in CI. Real queries need the real URL set.
+- **Apostrophes in JS strings.** `&apos;` only decodes inside JSX element children. In plain JS strings (template literals, args to native/browser APIs) it renders literally — always use a real `'`.
 
 ---
 
@@ -322,25 +312,21 @@ Prefer simple, readable code over clever code.
 
 ### 12. File organization
 
-src/
-  app/
-  components/
-    ui/
-    layout/
-    features/
-  constants/
-  lib/
-  types/
-  utils/
+Within `apps/web` (Next.js App Router):
+
+app/            routes (route groups: (auth), (app)), layouts, api/
+components/      ui/ + feature components
+lib/             web-only helpers
+public/          static assets, service worker
+
+Shared pure TS → `packages/shared/`. Backend → `packages/convex/`.
 
 Examples:
 
-components/ui/Button.tsx
-components/ui/Card.tsx
-components/layout/PageHeader.tsx
-constants/navigation.ts
-types/workout.ts
-utils/formatRestTime.ts
+components/ui/button.tsx
+components/app-shell.tsx
+lib/streak.ts
+lib/shop.ts
 
 ---
 

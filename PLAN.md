@@ -1,12 +1,12 @@
-# Liftify — Fitness Tracker Web PWA + Marketing Site
+# Liftify — Free Fitness Tracker Web PWA + Marketing Site
 
 > **Canonical copy.** A mirror is committed to the marketing repo. Keep both in sync on every
-> meaningful update.
+> meaningful update. Mark sections off (`- [x]`) as they are completed.
 
 ## Context
 
 This repo started as an Expo (React Native) monorepo with a strong Convex backend + Clerk
-auth but only scaffolded UI. The decision is to **abandon the mobile app** and ship a
+auth but only scaffolded UI. The decision was to **abandon the mobile app** and ship a
 **simple web PWA** plus a **marketing site**, under the **Liftify** brand:
 
 - **`liftify.com`** → marketing site (a Next.js 16 / React 19 / Tailwind v4 app — lives in a
@@ -15,11 +15,20 @@ auth but only scaffolded UI. The decision is to **abandon the mobile app** and s
 
 The product is deliberately tiny: **"Track workouts fast and see progress over time."**
 Bar for shippable = a new user logs their first workout in **under 30 seconds**, zero
-onboarding. Monetization is **paid-only**: a **30-day free trial → $7.99/mo** Stripe
-subscription. There is **no free tier** — the whole app is gated behind an active/trialing
-subscription. In-app promo offers (e.g. ~$2.99/mo for 6 months) are delivered via Stripe
-coupons. UI quality comes from a **shared design system** driven by the `taste-skill` agent
-skill, used identically across both repos.
+onboarding.
+
+### Monetization — free now, paid (with AI) later
+
+The app is **100% free for now**. There is **no subscription, no paywall, no Stripe** — every
+authenticated user has full access. Today's monetization is **passive only**:
+
+- **Donate** — a Ko‑fi "support" heart in the nav (`NEXT_PUBLIC_DONATE_URL`).
+- **Shop** — an Amazon Associates affiliate page (`/shop`, curated gear in `lib/shop.ts`).
+
+**Paid tier is deferred to a later phase and will be unlocked by AI features** (see §5). When
+it lands, the plan is a free core + a paid "Liftify AI" tier (e.g. AI workout suggestions,
+form/notes coaching, auto‑programming). Billing (Stripe) is intentionally **not built yet** —
+the schema and `convex/http.ts` are left forward‑compatible so it can slot in without a rewrite.
 
 > ⚠️ Both repos use a **customized Next.js 16** ("NOT the Next.js you know" per `AGENTS.md`).
 > Before writing any Next.js code, read the relevant guide in `node_modules/next/dist/docs/`
@@ -32,128 +41,161 @@ skill, used identically across both repos.
 ## 0. Tracked plan files
 - [x] Commit this plan as **`PLAN.md` in BOTH repos**, identical on every workstation.
       App repo's copy is canonical; mirror to the marketing repo.
-- [ ] Mark sections off (`- [x]`) as they are completed.
+- [ ] Rewrite the stale **`CLAUDE.md`** (still describes the old Expo/gamification/paid app) and
+      keep `packages/convex/AGENTS.md` accurate.
 
 ## 1. Shared design system (taste-skill)
-- [x] Install `design-taste-frontend` in both repos
-      (`npx skills add https://github.com/Leonxlnx/taste-skill`).
+- [x] Install `design-taste-frontend` in both repos.
 - [x] **Design read:** athletic-minimal, zinc/ink neutrals + one **volt-lime** accent
       (`#a3e635`). Dials — marketing 7/6/4, app calmer (motion 3 / density 5).
 - [x] Encode tokens in **Tailwind v4 `@theme inline`** in `app/globals.css` + a shared
       `.container-page` margin helper; identical block mirrored in both repos.
-- [ ] Build a tiny shared primitive set per repo (Button, Card, Input, Modal) using the tokens.
+- [x] Shared primitive set in the app (Button, Card, Input, Modal, etc.) using the tokens.
 
 ---
 
-## 2. App repo (`app.liftify.com`)
+## 2. App repo (`app.liftify.com`) — current state
 
 ### 2a. Scaffold — DONE
 - [x] Added **`apps/web`** (`@liftify/web`, Next.js 16 App Router + TS + Tailwind v4); builds.
 - [x] Deleted **`apps/mobile`**; converted monorepo **pnpm → npm workspaces** (dropped
       `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `.npmrc`, `expo-crypto` override).
-- [x] Renamed workspace packages to `@liftify/{web,convex,shared,tsconfig}`; Turbo
-      `build` outputs `.next/**`; root scripts use `npm --workspace`.
+- [x] Renamed workspace packages to `@liftify/{web,convex,shared,tsconfig}`; root package is
+      `liftify`; Turbo `build` outputs `.next/**`; root scripts use `npm --workspace`.
 - [x] Kept `packages/convex`, `packages/shared`, `packages/tsconfig`.
 
-### 2b. Backend — fresh simplified schema (3 tables)
-Rewrite `packages/convex/convex/schema.ts` down to:
+### 2b. Backend — actual Convex schema (`packages/convex/convex/schema.ts`)
+Free tracker, **7 tables** (grew past the original 3-table sketch; **no billing/subscription
+fields** anywhere). Indexes noted inline.
 ```ts
-users       { clerkId, email, firstName?, lastName?, units: "kg"|"lb",
-              stripeCustomerId?, stripeSubscriptionId?,
-              subscriptionStatus: "none"|"trialing"|"active"|"past_due"|"canceled",
-              currentPeriodEnd?, createdAt }                       // idx: by_clerk_id
-workouts    { userId, name, date, exercises: [ { name, sets, reps, weight } ] }  // idx: by_user
-bodyEntries { userId, date, weight, notes?, measurements?: { waist?, arms?, chest?, ... } } // idx: by_user
+users        { clerkId, email, firstName?, lastName?, units: "kg"|"lb",
+               weeklyGoal?, restSeconds?, bodyWeight?, tzOffset?, reminderHour?,
+               remindExercise?, remindWeighIn?, remindRest?,
+               lastExerciseReminderDay?, lastWeighInWeek?, createdAt }      // idx: by_clerk_id
+exercises    { name, muscleGroup?, equipment?,  // seeded, read-only library
+               externalId?, category?, level?, force?, mechanic?,
+               primaryMuscles?[], secondaryMuscles?[], instructions?[], images?[] }
+                                                            // idx: by_name, by_external_id
+workouts     { userId, name, date, durationSec?,
+               exercises: [ { name, sets: [ { reps, weight } ] } ] }        // idx: by_user_date
+checkins     { userId, date, type: "rest"|"cardio"|"stretching" }          // idx: by_user_date
+bodyEntries  { userId, date, weight, notes?,
+               measurements?: { waist?, chest?, arms?, hips?, thighs? } }   // idx: by_user_date
+notifications{ userId, type, title, body, weekKey?, createdAt, readAt? }   // idx: by_user
+pushSubscriptions { userId, endpoint, p256dh, auth, createdAt }   // idx: by_user, by_endpoint
 ```
-- [ ] MVP function surface:
-  - `users.getOrCreateCurrentUser`, `users.updateUnits`
-  - `workouts.create`, `workouts.listForUser`, `workouts.getLast`
-  - `bodyEntries.create`, `bodyEntries.listForUser`
-  - streak computed client-side from `workouts.listForUser` dates — no table.
-- [ ] Delete unused functions (plans, sessions, cardio, gamification, progress, metrics, quests).
-      Keep `exercises.list` + `exercises.seed` (strength only). Keep `auth.config.ts`.
+- [x] **No gamification** — XP/levels/achievements/quests tables + functions all removed.
+- [x] Function surface (one file per table, plus helpers):
+  - `users` — `getOrCreateCurrentUser`, `me`, `accessState` (free → always allowed),
+    `updateUnits`, `setTimezone`, reminder/profile prefs.
+  - `workouts` — create, list, edit, getLast, etc.
+  - `checkins` — log/list active-recovery days (feed the streak).
+  - `bodyEntries` — create / list / edit body-weight history.
+  - `exercises` + `exercisesSeed` — seeded library enriched from the **Free Exercise DB**
+    (public domain): muscles, equipment, instructions, images.
+  - `notifications`, `push`, `pushSender`, `crons` — in-app + Web Push reminders.
+  - `model.ts` shared helpers; `auth.config.ts` Clerk JWT; `http.ts` is an **empty router**
+    (placeholder for a future Stripe webhook — none today).
 
-### 2c. Auth (Clerk)
-- [ ] `@clerk/nextjs` + `ConvexProviderWithClerk` + `clerkMiddleware` gating `(app)`.
-- [ ] Configure Clerk for `app.liftify.com`. Keep `CLERK_JWT_ISSUER_DOMAIN` on Convex.
-- [ ] First authed load → `users.getOrCreateCurrentUser` (mints row, `subscriptionStatus:"none"`).
-- [ ] **Access gate:** all `(app)` screens require `subscriptionStatus` ∈ {trialing, active}.
-      Otherwise redirect to a `/subscribe` paywall (start trial / enter offer code).
+### 2c. Auth (Clerk) — DONE
+- [x] `@clerk/nextjs` + `ConvexProviderWithClerk` (`app/providers.tsx`); `middleware.ts`
+      gates `(app)`. First authed load → `users.getOrCreateCurrentUser` mints the row.
+- [x] **Access = authentication only.** The app is free, so `users.accessState` just reports
+      whether the user is signed in — there is no subscription gate and no `/subscribe` screen.
+- [ ] Configure a Clerk **production** instance for `app.liftify.com` (see `DEPLOY.md`).
 
-### 2d. Screens (App Router) — 4 screens + upgrade
+### 2d. Screens (App Router) — DONE
+Nav (sidebar on desktop, bottom tabs on mobile): **Home · Log · Body · Progress · Shop**, with
+**Settings** + a **Donate** heart + a **notification bell** in the chrome (`components/app-shell.tsx`).
 ```
 app/(auth)/sign-in , sign-up
-app/(app)/layout.tsx            # providers, nav, auth guard
+app/(app)/layout.tsx            # AppShell: nav, auth ensure-user, rest-timer + notifications
 app/(app)/page.tsx              # HOME (Today): Start Workout · last workout · streak
-app/(app)/workout/new/page.tsx  # LOG: rows {exercise, sets, reps, weight} → Save
-app/(app)/progress/page.tsx     # PROGRESS: workouts/week + strength chart (Pro)
-app/(app)/body/page.tsx         # BODY PROGRESS: weight chart · add modal · measurements
+app/(app)/workout/new/page.tsx  # LOG: per-set rows {exercise, sets:[{reps,weight}]} → Save
+app/(app)/workout/[id]/page.tsx # EDIT a saved workout
+app/(app)/history/page.tsx      # HISTORY: past workouts list
+app/(app)/progress/page.tsx     # PROGRESS: workouts/week + strength charts
+app/(app)/body/page.tsx         # BODY: weight chart · add/edit modal · measurements
+app/(app)/shop/page.tsx         # SHOP: Amazon-affiliate gear (lib/shop.ts)
+app/(app)/settings/page.tsx     # SETTINGS: units, reminders, account, sign out
+app/api/delete-account/route.ts # account deletion
 app/manifest.ts                 # PWA manifest
 middleware.ts                   # clerkMiddleware
 ```
-- [ ] **Log Workout** = the heart — fast entry, autofocus, sane defaults (30-sec test).
-- [ ] No per-feature gating — full app is paid; access is the subscription gate (2c).
-      Add a `/subscribe` paywall screen for `none`/lapsed users (start trial · apply offer code).
+- [x] **Log Workout** is the heart — fast per-set entry, autofocus, prefill best weight,
+      "Add set" duplicates the previous set, +/- vs all-time best.
 
-### 2e. Stripe billing — $7.99/mo, 30-day trial (all in Convex)
-- [ ] Stripe product + one recurring monthly price ($7.99) → `STRIPE_PRICE_ID`.
-- [ ] `billing.createCheckoutSession` Convex **action** → Checkout (subscription mode,
-      `trial_period_days: 30`, `allow_promotion_codes: true`); store `stripeCustomerId`.
-- [ ] **In-app offers:** Stripe coupons / promotion codes (e.g. `duration: repeating`,
-      `duration_in_months: 6`, ~$5 off → ≈$2.99/mo for 6 months). Surface in `/subscribe`
-      and as a retention offer; apply via Checkout `discounts` or to the live subscription.
-- [ ] `convex/http.ts` **HTTP action** = Stripe webhook: verify sig; sync
-      `subscriptionStatus` + `currentPeriodEnd` from `customer.subscription.*` events.
-- [ ] Customer Portal link to manage/cancel.
-- [ ] Convex env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`.
-- [ ] **OPEN DECISION:** card-required trial (Checkout up front, auto-converts — default) vs
-      no-card trial (track trial in-app, collect card at conversion). Default = card-required.
+### 2e. Billing — DEFERRED (not built; ties to the AI tier in §5)
+- [ ] No Stripe today. When the paid AI tier ships: Stripe product + monthly price,
+      `billing.createCheckoutSession` Convex **action**, a webhook **HTTP action** in
+      `convex/http.ts` syncing `subscriptionStatus`/`currentPeriodEnd` onto a (then-added)
+      set of `users` fields, and a Customer Portal link. Convex env:
+      `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`. `DEPLOY.md` already
+      reserves these as future env vars.
 
 ### 2f. PWA + polish
-- [x] `app/manifest.ts` + icons (192/512 + maskable) + a minimal online-first service
-      worker (precache shell; Serwist deferred). Installable. (Offline writes out of MVP.)
+- [x] `app/manifest.ts` + icons (192/512 + maskable) + a minimal online-first service worker
+      (precache shell). Installable. (Offline writes out of scope.)
+- [x] kg/lb toggle in **Settings**; logo/favicon/splash; light + dark.
 - [ ] Verify "Add to Home Screen" on a real phone (Safari + Chrome).
-- [x] kg/lb toggle in **Settings**. Remaining polish: more empty/loading states.
 
-### 2g. Extras built beyond the MVP plan
-- [x] Per-set logging ("Add set" duplicates previous); +/- vs all-time best; prefill best weight.
-- [x] In-progress workout persists across nav; Finish confirm dialog; edit a saved workout.
-- [x] Weekly body-weight reminder + notification bell (lazy + weekly cron).
-- [x] Editable body-weight history; Settings (units / account / membership / sign out).
+### 2g. Features built beyond the original MVP sketch
+- [x] **Streaks** — `checkins` table (rest/cardio/stretch) + `lib/streak.ts` keep a streak
+      alive on non-lifting days. Surfaced on Home.
+- [x] **PRs / personal bests** — `lib/prs.ts`; Log shows +/- vs all-time best and prefills it.
+- [x] **Rest timer** — `components/rest-timer.tsx` provider, default length in Settings.
+- [x] **Reminders** — in-app `notifications` + **Web Push** (`pushSubscriptions`, VAPID),
+      weekly weigh-in + daily exercise nudges via Convex `crons`; **notification bell** in nav.
+- [x] **Exercise library** — seeded & enriched from the Free Exercise DB (muscles, equipment,
+      instructions, images).
+- [x] Editable workouts & body-weight history; in-progress workout persists across nav;
+      Finish-confirm dialog; account deletion.
+- [x] **Donate** (Ko-fi) + **Shop** (Amazon Associates) as the current passive monetization.
 
 ---
 
 ## 3. Marketing site (`liftify.com`) — separate repo
 - [ ] Landing page (shared tokens + design-taste-frontend): hero one-promise headline ·
-      3 feature blurbs (fast logging · progress charts · body journal) · pricing card
-      ($7.99/mo, 30-day free trial) · CTAs → `app.liftify.com/sign-up`.
-- [ ] Footer + Privacy / Terms stubs (required before taking payments).
+      3 feature blurbs (fast logging · progress charts · body journal) · **"free"** CTA →
+      `app.liftify.com/sign-up`. (Pricing card deferred until the paid AI tier exists.)
+- [ ] Footer + Privacy / Terms stubs.
 
 ---
 
-## 4. Deploy / infra
-- [ ] Two Vercel projects: `liftify.com`/`www` → marketing; `app.liftify.com` → app.
+## 4. Deploy / infra (see `DEPLOY.md` for the full runbook)
+- [ ] Two Vercel projects: `liftify.com`/`www` → marketing; `app.liftify.com` → app
+      (root dir `apps/web`).
+- [ ] Convex **production** deployment (`npx convex deploy`) → app's `NEXT_PUBLIC_CONVEX_URL`.
+- [ ] Clerk **production** instance + "Convex" JWT template → `CLERK_JWT_ISSUER_DOMAIN` on
+      Convex prod.
+- [ ] App env: `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`,
+      `CLERK_SECRET_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_DONATE_URL`. VAPID keys for Web
+      Push on Convex.
 - [ ] DNS for apex + `app` subdomain.
 - [ ] Rename the marketing repo + local folder from `corevex` → `liftify` (GitHub + disk).
-- [ ] App env: `NEXT_PUBLIC_CONVEX_URL`, Clerk keys, `NEXT_PUBLIC_APP_URL`. Convex env per 2e.
-      Register the Stripe webhook at the Convex HTTP endpoint.
 
 ---
 
-## Deferred (post-MVP / v2)
-Free trial, workout plans/templates, cardio, achievements/quests/XP levels, charts beyond the
-two, HealthKit/Google Fit, offline-write, additional marketing pages. Also: rewrite the stale
-`CLAUDE.md`/`AGENTS.md` (still describe the old Expo/gamification architecture).
+## 5. Future — paid "Liftify AI" tier
+The deferred paywall returns as an **AI upsell**, not a gate on the core tracker. Likely scope:
+- AI workout suggestions / next-session auto-programming from a user's history & PRs.
+- Natural-language workout logging and form/notes coaching.
+- Trends & insights summaries over `workouts` / `bodyEntries`.
+- **Then** wire Stripe per §2e (free core stays free; AI features are the paid unlock).
+
+---
+
+## Deferred (post-MVP / not now)
+Stripe billing (until §5), workout plans/templates, cardio as a first-class log, the old
+gamification (XP/levels/achievements/quests), HealthKit/Google Fit, offline writes, additional
+marketing pages.
 
 ---
 
 ## Verification
-- **Backend:** `npm run convex:dev`; confirm the 3 tables; run `workouts.create` /
-  `bodyEntries.create` / `users.getOrCreateCurrentUser`.
-- **App e2e:** `npm run web`; sign in (Clerk) → hit the `/subscribe` gate → start trial →
-  log a workout in < 30s → see it on Home → add a body entry.
-- **Billing:** Stripe test card through Checkout (30-day trial) → webhook sets
-  `subscriptionStatus` `trialing`→`active`; apply an offer coupon → discounted; cancel via
-  Customer Portal → `canceled` and the app re-gates.
-- **PWA:** Lighthouse PWA pass; install to home screen and launch standalone.
+- **Backend:** `npm run convex:dev`; confirm the 7 tables; run `workouts.create` /
+  `bodyEntries.create` / `checkins` / `users.getOrCreateCurrentUser`.
+- **App e2e:** `npm run web`; sign in (Clerk) → land straight in the app (no paywall) →
+  log a workout in < 30s → see it on Home + History → add a body entry → check streak.
+- **PWA:** Lighthouse PWA pass; install to home screen and launch standalone; Web Push nudge.
 - **Design parity:** `globals.css` token block identical in both repos.

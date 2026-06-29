@@ -18,6 +18,51 @@ function startOfUtcWeekMonday(ms: number): number {
   return d.getTime() - fromMonday * DAY;
 }
 
+// Minutes between UTC and the zone's local wall clock at instant `ms`, matching
+// Date.getTimezoneOffset()'s sign (UTC = local + offset). Recomputed from the
+// IANA zone every run, so a DST change is always reflected automatically.
+function zoneOffsetMinutes(ms: number, timeZone: string): number {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts: Record<string, string> = {};
+  for (const part of formatter.formatToParts(new Date(ms))) {
+    parts[part.type] = part.value;
+  }
+  const localAsUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return Math.round((ms - localAsUtc) / 60_000);
+}
+
+// Prefer the stored IANA zone (DST-correct); fall back to the legacy numeric
+// offset, then UTC. A bad zone string degrades gracefully to the offset.
+function userOffsetMinutes(
+  user: { timeZone?: string; tzOffset?: number },
+  now: number,
+): number {
+  if (user.timeZone) {
+    try {
+      return zoneOffsetMinutes(now, user.timeZone);
+    } catch {
+      // Unknown/invalid zone — fall through to the stored offset.
+    }
+  }
+  return user.tzOffset ?? 0;
+}
+
 export const listForUser = query({
   args: {},
   handler: async (ctx) => {
@@ -73,7 +118,7 @@ export const runReminders = internalMutation({
     const now = Date.now();
     const users = await ctx.db.query("users").collect();
     for (const u of users) {
-      const tz = u.tzOffset ?? 0; // minutes; UTC = local + tz
+      const tz = userOffsetMinutes(u, now); // minutes; UTC = local + tz
       const hour = u.reminderHour ?? 18;
       const localMs = now - tz * 60_000; // read getUTC* as local wall-clock
       if (new Date(localMs).getUTCHours() !== hour) continue;

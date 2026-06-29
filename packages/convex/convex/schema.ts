@@ -21,7 +21,8 @@ export default defineSchema({
     restSeconds: v.optional(v.number()), // default rest timer length
     bodyWeight: v.optional(v.number()), // for bodyweight-load math (in `units`)
     lastExerciseReminderDay: v.optional(v.number()), // dayKey of last daily nudge
-    tzOffset: v.optional(v.number()), // minutes (Date.getTimezoneOffset)
+    timeZone: v.optional(v.string()), // IANA zone, e.g. "America/New_York" (DST-correct)
+    tzOffset: v.optional(v.number()), // legacy fallback: minutes (Date.getTimezoneOffset)
     reminderHour: v.optional(v.number()), // local hour 0-23 for reminders
     // Reminder toggles (undefined = on by default).
     remindExercise: v.optional(v.boolean()),

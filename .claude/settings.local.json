@@ -5,7 +5,9 @@
       "PowerShell(pnpm --version)",
       "PowerShell(pnpm ls --depth=0 -r 2>&1)",
       "PowerShell(Get-ChildItem -Path . -Force -File | Where-Object { $_.Name -eq \".npmrc\" } | Select-Object FullName; Get-ChildItem -Path \"apps\\\\mobile\" -Force -File | Where-Object { $_.Name -eq \".npmrc\" } | Select-Object FullName)",
-      "PowerShell(pnpm install 2>&1)"
+      "PowerShell(pnpm install 2>&1)",
+      "Bash(ls \"C:\\\\Users\\\\laith\\\\.claude\\\\plans\\\\\" 2>/dev/null; echo \"---\"; find \"C:\\\\Users\\\\laith\\\\.claude\\\\plans\" -iname \"*brooks*\" 2>/dev/null)",
+      "Read(//c/Users/laith/.claude/plans\" 2>/**)"
     ]
   }
 }

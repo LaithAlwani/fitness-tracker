@@ -24,8 +24,8 @@ export async function getCurrentUserOrThrow(
   return user;
 }
 
-// For write paths: return the user row, creating it (with a fresh trial) if the
-// authenticated user has none yet. Avoids racing the on-load ensure step.
+// For write paths: return the user row, creating it if the authenticated user
+// has none yet. Avoids racing the on-load ensure step.
 export async function getOrCreateUser(
   ctx: MutationCtx,
 ): Promise<Doc<"users">> {

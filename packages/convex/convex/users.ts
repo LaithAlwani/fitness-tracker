@@ -4,8 +4,8 @@ import { mutation, query } from "./_generated/server";
 import { getCurrentUser, getCurrentUserOrThrow } from "./model";
 
 // Called on first authenticated load. Creates the user row if missing and keeps
-// the profile in sync with Clerk. New users start a no-card 30-day trial so the
-// app is immediately usable; once Stripe is wired its webhook owns the status.
+// the profile in sync with Clerk. The app is free, so a new user has full access
+// the moment their row exists.
 export const getOrCreateCurrentUser = mutation({
   args: {},
   handler: async (ctx) => {
@@ -112,13 +112,25 @@ export const setUnits = mutation({
   },
 });
 
-// Record the device's UTC offset (minutes) so reminders fire in local time.
+// Record the device's time zone so reminders fire in the user's local time.
+// We store the IANA zone (DST-correct) and keep the raw offset as a fallback for
+// when a zone string is unavailable.
 export const setTimezone = mutation({
-  args: { tzOffset: v.number() },
-  handler: async (ctx, { tzOffset }) => {
+  args: {
+    timeZone: v.optional(v.string()),
+    tzOffset: v.optional(v.number()),
+  },
+  handler: async (ctx, { timeZone, tzOffset }) => {
     const user = await getCurrentUser(ctx);
     if (!user) return;
-    if (user.tzOffset !== tzOffset) await ctx.db.patch(user._id, { tzOffset });
+    const patch: { timeZone?: string; tzOffset?: number } = {};
+    if (timeZone !== undefined && user.timeZone !== timeZone) {
+      patch.timeZone = timeZone;
+    }
+    if (tzOffset !== undefined && user.tzOffset !== tzOffset) {
+      patch.tzOffset = tzOffset;
+    }
+    if (Object.keys(patch).length > 0) await ctx.db.patch(user._id, patch);
   },
 });
 
