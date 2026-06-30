@@ -1,13 +1,16 @@
 # Dependencies
 node_modules/
-.pnpm-store/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+.vercel/
 
 # Build output
 dist/
 build/
 .turbo/
-.expo/
-.expo-shared/
 
 # Environment files
 .env
@@ -16,14 +19,6 @@ build/
 
 # Convex
 .convex/
-
-# Expo
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-*.orig.*
 
 # IDE / OS
 .vscode/
@@ -35,10 +30,10 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 
 # Testing
 coverage/
 
 # Misc
 *.tsbuildinfo
+*.orig.*

@@ -34,7 +34,7 @@ the schema and `convex/http.ts` are left forward‑compatible so it can slot in 
 > Before writing any Next.js code, read the relevant guide in `node_modules/next/dist/docs/`
 > (App Router docs live under `01-app/`). Tailwind is **v4** (`@theme inline` in
 > `globals.css`, no `tailwind.config.*`). Fonts are Geist / Geist Mono via `next/font/google`.
-> Package manager is **npm workspaces**. Workspace packages are scoped **`@liftify/*`**.
+> Package manager is **npm** — a single app at the repo root (no workspaces, no Turborepo).
 
 ---
 
@@ -42,7 +42,7 @@ the schema and `convex/http.ts` are left forward‑compatible so it can slot in 
 - [x] Commit this plan as **`PLAN.md` in BOTH repos**, identical on every workstation.
       App repo's copy is canonical; mirror to the marketing repo.
 - [ ] Rewrite the stale **`CLAUDE.md`** (still describes the old Expo/gamification/paid app) and
-      keep `packages/convex/AGENTS.md` accurate.
+      keep `convex/AGENTS.md` accurate.
 
 ## 1. Shared design system (taste-skill)
 - [x] Install `design-taste-frontend` in both repos.
@@ -57,14 +57,14 @@ the schema and `convex/http.ts` are left forward‑compatible so it can slot in 
 ## 2. App repo (`app.liftify.com`) — current state
 
 ### 2a. Scaffold — DONE
-- [x] Added **`apps/web`** (`@liftify/web`, Next.js 16 App Router + TS + Tailwind v4); builds.
-- [x] Deleted **`apps/mobile`**; converted monorepo **pnpm → npm workspaces** (dropped
-      `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `.npmrc`, `expo-crypto` override).
-- [x] Renamed workspace packages to `@liftify/{web,convex,shared,tsconfig}`; root package is
-      `liftify`; Turbo `build` outputs `.next/**`; root scripts use `npm --workspace`.
-- [x] Kept `packages/convex`, `packages/shared`, `packages/tsconfig`.
+- [x] Single Next.js 16 app (App Router + TS + Tailwind v4) at the **repo root**; builds.
+- [x] Deleted **`apps/mobile`** and the Expo toolchain (`pnpm-workspace.yaml`, `pnpm-lock.yaml`,
+      `.npmrc`, `expo-crypto` override).
+- [x] **Flattened the monorepo**: removed Turborepo + npm workspaces; moved `apps/web/*` to the
+      root and `packages/convex/convex` → root `convex/`; deleted the unused `packages/shared`
+      and `packages/tsconfig`. Root package is `liftify`; dev = `npm run dev`, backend = `npm run convex`.
 
-### 2b. Backend — actual Convex schema (`packages/convex/convex/schema.ts`)
+### 2b. Backend — actual Convex schema (`convex/schema.ts`)
 Free tracker, **7 tables** (grew past the original 3-table sketch; **no billing/subscription
 fields** anywhere). Indexes noted inline.
 ```ts
@@ -164,7 +164,7 @@ middleware.ts                   # clerkMiddleware
 
 ## 4. Deploy / infra (see `DEPLOY.md` for the full runbook)
 - [ ] Two Vercel projects: `liftify.com`/`www` → marketing; `app.liftify.com` → app
-      (root dir `apps/web`).
+      (root dir = repo root).
 - [ ] Convex **production** deployment (`npx convex deploy`) → app's `NEXT_PUBLIC_CONVEX_URL`.
 - [ ] Clerk **production** instance + "Convex" JWT template → `CLERK_JWT_ISSUER_DOMAIN` on
       Convex prod.

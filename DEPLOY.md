@@ -4,13 +4,13 @@ Two Vercel projects (app + marketing) and one Convex **production** deployment.
 
 ```
 liftify.com       -> marketing Vercel project (the corevex repo)
-app.liftify.com   -> app Vercel project (this repo, root dir apps/web)
+app.liftify.com   -> app Vercel project (this repo, root dir = repo root)
 Convex (prod)     -> backend for the app (separate from your dev deployment)
 ```
 
 ## 1. Convex production backend
 
-From `packages/convex`:
+From the repo root:
 
 ```bash
 npx convex deploy            # creates/updates the PROD deployment, prints its URL
@@ -43,7 +43,7 @@ Dev keys (`pk_test_…`) only work on localhost. For `app.liftify.com`:
 ## 3. App on Vercel  →  app.liftify.com
 
 - Import the `fitness-tracker` repo.
-- **Root Directory:** `apps/web` (Vercel installs the npm workspace from the repo root).
+- **Root Directory:** repo root (the app now lives at the root, not in `apps/web`).
 - Framework preset: **Next.js** (auto). Install/Build commands: defaults.
 - **Environment Variables (Production):**
 
@@ -72,7 +72,7 @@ Dev keys (`pk_test_…`) only work on localhost. For `app.liftify.com`:
 
 - Stripe env vars live **only on the Convex prod deployment** (step 1), never on Vercel —
   checkout + webhook run inside Convex.
-- The committed `packages/convex/convex/_generated` lets the app build on Vercel without a
+- The committed `convex/_generated` lets the app build on Vercel without a
   Convex codegen step; `npx convex deploy` keeps the prod functions in sync.
 - Optional automation: set a Vercel env `CONVEX_DEPLOY_KEY` (Convex dashboard → prod deploy
   key) and override the app build command to `npx convex deploy --cmd 'npm run build'` so

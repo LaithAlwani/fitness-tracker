@@ -14,7 +14,7 @@
 
 **Two products, two repos:**
 - **`liftify.com`** → marketing site (separate repo — the local `corevex` folder, pending rename).
-- **`app.liftify.com`** → the PWA (**this** repo, root dir `apps/web`).
+- **`app.liftify.com`** → the PWA (**this** repo — a single Next.js app at the repo root).
 
 ### Stack
 
@@ -23,49 +23,43 @@
 - **Tailwind v4** — tokens via `@theme inline` in `app/globals.css`; **no `tailwind.config.*`**. Shared `.container-page` helper.
 - **Clerk** auth via `@clerk/nextjs` (`ClerkProvider` in the root layout).
 - **Convex** database via `convex/react` + `ConvexProviderWithClerk`.
-- **Web Push** (VAPID) + a minimal online-first **service worker** (`apps/web/public/sw.js`).
+- **Web Push** (VAPID) + a minimal online-first **service worker** (`public/sw.js`).
 - **@phosphor-icons/react** for icons. **Geist / Geist Mono** via `next/font/google`.
-- **npm workspaces + Turborepo** monorepo. Workspace packages scoped **`@liftify/*`**.
+- **Plain npm, single app** — no monorepo, no Turborepo, no workspaces.
 
-### Monorepo layout
+### Project layout
 
 ```
-fitness-tracker/
-├── apps/
-│   └── web/                     Next.js 16 PWA (@liftify/web) — the only app
-│       ├── app/
-│       │   ├── (auth)/          sign-in, sign-up
-│       │   ├── (app)/           home, workout/new, workout/[id], history, progress, body, shop, settings
-│       │   ├── api/             route handlers (e.g. delete-account)
-│       │   ├── layout.tsx       ClerkProvider + Providers + service-worker registration
-│       │   ├── providers.tsx    ConvexProviderWithClerk
-│       │   └── manifest.ts      PWA manifest
-│       ├── components/          ui/ (Button, Card, …) + app-shell, rest-timer, notification-bell,
-│       │                        plate-calculator, body-diagram, onboarding, push-toggle, …
-│       ├── lib/                 web-only helpers: streak.ts, prs.ts, shop.ts
-│       └── public/              sw.js, icons, logo
-├── packages/
-│   ├── convex/                  @liftify/convex — backend (7 tables; see schema.ts)
-│   ├── shared/                  @liftify/shared — pure TS (units, prs, exercises)
-│   └── tsconfig/                shared tsconfig presets
-└── (root) package.json (npm workspaces), turbo.json, tsconfig.json, PLAN.md, DEPLOY.md
+fitness-tracker/                 single Next.js app at the repo root
+├── app/                         App Router routes
+│   ├── (auth)/                  sign-in, sign-up, sso-callback (custom Clerk forms)
+│   ├── (app)/                   home, workout/new, workout/[id], history, progress, body, shop, settings
+│   ├── api/                     route handlers (e.g. delete-account)
+│   ├── layout.tsx               ClerkProvider + Providers + service-worker registration
+│   ├── providers.tsx            ConvexProviderWithClerk
+│   └── manifest.ts              PWA manifest
+├── components/                  ui/ + app-shell, rest-timer, notification-bell, onboarding,
+│                                plate-calculator, body-diagram, push-toggle, auth/, …
+├── lib/                         helpers: streak.ts, prs.ts, shop.ts, clerk-errors.ts
+├── convex/                      Convex backend (7 tables; see schema.ts) + its own tsconfig.json
+├── public/                      sw.js, icons, logo
+├── proxy.ts                     Clerk middleware (Next 16 renamed middleware → proxy)
+└── package.json · tsconfig.json · next.config.ts · PLAN.md · DEPLOY.md
 ```
 
 ### Backend (Convex) — 7 tables, free app
 
 `users` (profile + reminder prefs, **no billing fields**), `exercises` (seeded read-only library, enriched from the public-domain **Free Exercise DB** — muscles, equipment, instructions, images), `workouts` (per-set `{reps, weight}` arrays + `durationSec`), `checkins` (rest/cardio/stretching active-recovery — feeds streaks), `bodyEntries` (weight + optional measurements), `notifications` (in-app), `pushSubscriptions` (Web Push). `convex/http.ts` is an **empty router** — a placeholder for a future Stripe webhook; there is none today.
 
-### Workspace dependency rules
+### Project structure rules
 
-- `apps/web` → depends on `@liftify/shared`, `@liftify/convex`.
-- `@liftify/convex` → depends on `@liftify/shared` (mutations evaluate the same predicates the client uses).
-- `@liftify/shared` → **pure TypeScript only**. No `react`, `next`, or any DOM/native imports. Anything that breaks this is a bug.
-  > Cleanup note: `shared` still ships legacy gamification modules (`xp.ts`, `achievements.ts`, `quests.ts`) from the old app. They are **unused** by the current web app/backend — don't build on them; they're candidates for deletion.
+- **Single app, no workspaces.** App code (`app/`, `components/`, `lib/`) and the Convex backend (`convex/`) live together at the repo root. The old `@liftify/*` packages are gone — `packages/shared` and `packages/tsconfig` were **deleted** (nothing imported `@liftify/shared`; the app has its own `lib/prs.ts`).
+- Anything `convex/` imports must stay **pure TypeScript** (no `react`/`next`/DOM) so it bundles in the Convex runtime.
 
 ### Conventions specific to this project
 
-- **Imports**: Convex API via `import { api } from "@liftify/convex"`. Shared lib via `import { convertWeight } from "@liftify/shared"`.
-- **Auth**: handled at the provider level — `ClerkProvider` (root layout) + `ConvexProviderWithClerk` (`app/providers.tsx`). `AppShell` calls `users.getOrCreateCurrentUser` on first authenticated load. There is currently **no `middleware.ts`**; if you add server-side route protection, add one (and update `DEPLOY.md`).
+- **Imports**: Convex API via `import { api } from "@/convex/_generated/api"`; types via `@/convex/_generated/dataModel`. The `@/*` alias maps to the repo root.
+- **Auth gate**: `proxy.ts` at the repo root runs Clerk's `clerkMiddleware()` (**Next 16 renamed `middleware` → `proxy`**), protecting everything except `/sign-in`, `/sign-up`, `/sso-callback`. Custom auth screens (`app/(auth)/`) use `useSignIn`/`useSignUp` with Google OAuth + email-code verification. `AppShell` calls `users.getOrCreateCurrentUser` on first authenticated load.
 - **Access is auth-only**: the app is free, so `users.accessState` just reports sign-in state. No subscription checks, no paywall redirects.
 - **Styling**: Tailwind v4 utility classes driven by the `@theme inline` tokens in `globals.css`. Don't add a `tailwind.config.*`.
 - **Icons**: `@phosphor-icons/react`.
@@ -74,40 +68,38 @@ fitness-tracker/
 
 | Action | Command |
 |---|---|
-| Run the web app (dev) | `npm run web` |
-| Run Convex dev (codegen + watch) | `npm run convex:dev` |
-| Run everything via Turbo | `npm run dev` |
-| Type check all workspaces | `npm run typecheck` |
-| Lint all workspaces | `npm run lint` |
-| Test (shared) | `npm run test` |
+| Run the app (dev) | `npm run dev` |
+| Run Convex (codegen + watch) | `npm run convex` |
+| Type check (app + convex) | `npm run typecheck` |
+| Lint | `npm run lint` |
+| Production build | `npm run build` |
 | Deploy Convex prod | `npm run convex:deploy` |
 
-Deploy runbook: see `DEPLOY.md` (two Vercel projects + one Convex prod deployment).
+Run `npm run dev` and `npm run convex` in two terminals during development. Deploy runbook: see `DEPLOY.md`.
 
 ### Hard "don't"s (deferred, not forgotten)
 
 - **No billing / Stripe / paywall yet.** The app is free. Billing arrives with the paid AI tier (`PLAN.md` §5). Schema + `http.ts` are left forward-compatible for it.
 - **No gamification.** XP/levels/achievements/quests were removed — don't reintroduce them.
-- **No shared logic in `apps/web/lib/`** — anything pure TS that the backend also needs belongs in `packages/shared/`.
 - **No HealthKit / Google Fit, no offline writes, no workout plans/templates** in this version.
-- **Don't delete `packages/convex/convex/_generated`** — it's committed so Vercel can build the app without a Convex codegen step.
+- **Don't delete `convex/_generated`** — it's committed so Vercel can build the app without a Convex codegen step.
 - **No `--no-verify`, `--force` git pushes, or destructive resets** without explicit user authorization.
 
 ### Environment variables
 
-App (Vercel / `apps/web/.env.local`): `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_DONATE_URL`. Convex: `CLERK_JWT_ISSUER_DOMAIN` + VAPID keys for Web Push. (Future Stripe keys live on Convex prod only — see `DEPLOY.md`.)
+One **root `.env.local`** serves both Next and the Convex CLI. App vars: `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `NEXT_PUBLIC_DONATE_URL`. The Convex CLI manages `CONVEX_DEPLOYMENT` / `CONVEX_URL` / `CONVEX_SITE_URL`. Convex deployment env (`npx convex env set`): `CLERK_JWT_ISSUER_DOMAIN` + VAPID keys. (Future Stripe keys live on Convex prod only — see `DEPLOY.md`.)
 
 ### Gotchas (append as discovered)
 
-- **Customized Next.js 16.** Don't assume stock Next.js behavior — read `node_modules/next/dist/docs/` first.
+- **Customized Next.js 16.** Don't assume stock Next.js behavior — read `node_modules/next/dist/docs/` first. Middleware lives in **`proxy.ts`** (Next 16 renamed `middleware` → `proxy`); a stray `middleware.ts` won't run.
 - **Tailwind v4, no config file.** Design tokens are defined in `app/globals.css` via `@theme inline`. Editing a "theme color" means editing that block, not a `tailwind.config.js`.
-- **Committed Convex `_generated`.** Vercel builds `apps/web` without running Convex codegen, so the generated API types are committed. Run `npm run convex:deploy` to keep prod functions in sync after schema/function changes.
+- **Committed Convex `_generated`.** Vercel builds the app without running Convex codegen, so the generated API types are committed under `convex/_generated`. Run `npm run convex:deploy` to keep prod functions in sync after schema/function changes.
 - **Placeholder Convex URL.** `app/providers.tsx` falls back to `https://placeholder.convex.cloud` when `NEXT_PUBLIC_CONVEX_URL` is unset so `next build` never crashes in CI. Real queries need the real URL set.
 - **Apostrophes in JS strings.** `&apos;` only decodes inside JSX element children. In plain JS strings (template literals, args to native/browser APIs) it renders literally — always use a real `'`.
 
 ---
 
-## Code Style Rules (apply to all workspaces)
+## Code Style Rules (apply across the app)
 
 ## Goal
 
@@ -312,14 +304,14 @@ Prefer simple, readable code over clever code.
 
 ### 12. File organization
 
-Within `apps/web` (Next.js App Router):
+At the repo root (Next.js App Router):
 
 app/            routes (route groups: (auth), (app)), layouts, api/
 components/      ui/ + feature components
 lib/             web-only helpers
 public/          static assets, service worker
 
-Shared pure TS → `packages/shared/`. Backend → `packages/convex/`.
+Backend (Convex functions) → `convex/`.
 
 Examples:
 

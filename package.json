@@ -7,22 +7,35 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
-    "web": "npm run dev --workspace @liftify/web",
-    "convex:dev": "npm exec --workspace @liftify/convex -- convex dev",
-    "convex:deploy": "npm exec --workspace @liftify/convex -- convex deploy"
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "convex": "convex dev",
+    "convex:deploy": "convex deploy"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^6",
+    "@phosphor-icons/react": "^2.1.10",
+    "convex": "^1.17.4",
+    "next": "16.2.9",
+    "react": "19.2.4",
+    "react-body-highlighter": "^2.0.5",
+    "react-dom": "19.2.4",
+    "recharts": "^3.8.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "turbo": "^2.3.3",
-    "typescript": "^5.7.2"
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.9",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }
