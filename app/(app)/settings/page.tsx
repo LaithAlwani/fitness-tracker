@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useUser, useClerk, SignOutButton } from "@clerk/nextjs";
 import { useMutation, useQuery, useConvex } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -11,9 +12,20 @@ import {
   Minus,
   Plus,
   DownloadSimple,
+  CaretLeft,
 } from "@phosphor-icons/react";
 import { PushToggle } from "@/components/push-toggle";
 import { Button } from "@/components/ui/button";
+
+// Shared style constants so the whole page is easy to re-theme in one place.
+const cardStyles =
+  "flex flex-col gap-4 rounded-[16px] border border-border bg-card p-5";
+const cardTitleStyles = "font-display text-base font-extrabold";
+const rowStyles = "flex items-center justify-between gap-4";
+const rowLabelStyles = "text-sm font-semibold";
+const rowDescStyles = "mt-0.5 text-xs leading-snug text-muted-foreground";
+const steelButtonStyles =
+  "inline-flex items-center gap-2 rounded-[10px] border border-border-strong px-4 py-3 font-mono text-xs uppercase tracking-[0.08em] text-bright transition-colors hover:border-accent/40 disabled:opacity-50";
 
 function toCsv(rows: (string | number)[][]) {
   return rows
@@ -38,8 +50,6 @@ function downloadCsv(filename: string, text: string) {
   URL.revokeObjectURL(url);
 }
 
-const UNITS = ["lb", "kg"] as const;
-
 function fmtRest(sec: number) {
   if (sec < 60) return `${sec}s`;
   const m = Math.floor(sec / 60);
@@ -53,6 +63,40 @@ function fmtHour(h: number) {
   return `${h12}:00 ${am ? "AM" : "PM"}`;
 }
 
+// Rounded pill of mutually exclusive options (LB/KG, text size).
+type SegmentOption<T extends string> = { key: T; label: string };
+function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: SegmentOption<T>[];
+  value: T;
+  onChange: (key: T) => void;
+}) {
+  return (
+    <div className="inline-flex gap-1 rounded-full border border-border bg-surface-3 p-1">
+      {options.map((option) => {
+        const isActive = option.key === value;
+        return (
+          <button
+            key={option.key}
+            type="button"
+            onClick={() => onChange(option.key)}
+            className={`rounded-full px-4 py-2 font-mono text-xs font-semibold uppercase tracking-[0.04em] transition-colors ${
+              isActive
+                ? "bg-accent text-accent-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Switch({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
     <button
@@ -60,13 +104,13 @@ function Switch({ on, onClick }: { on: boolean; onClick: () => void }) {
       role="switch"
       aria-checked={on}
       onClick={onClick}
-      className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors ${
-        on ? "bg-accent" : "bg-muted"
+      className={`flex h-[26px] w-[46px] shrink-0 items-center rounded-full p-[3px] transition-colors ${
+        on ? "justify-end bg-accent" : "justify-start bg-muted"
       }`}
     >
       <span
-        className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${
-          on ? "translate-x-5" : "translate-x-0"
+        className={`size-5 rounded-full transition-colors ${
+          on ? "bg-accent-foreground" : "bg-dim"
         }`}
       />
     </button>
@@ -85,10 +129,10 @@ function ReminderRow({
   onToggle: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div>
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-xs text-muted-foreground">{desc}</p>
+    <div className={rowStyles}>
+      <div className="min-w-0">
+        <p className={rowLabelStyles}>{title}</p>
+        <p className={rowDescStyles}>{desc}</p>
       </div>
       <Switch on={on} onClick={onToggle} />
     </div>
@@ -104,24 +148,18 @@ function Stepper({
   onDec: () => void;
   onInc: () => void;
 }) {
+  const stepButtonStyles =
+    "flex size-[30px] items-center justify-center rounded-full bg-muted text-bright transition-colors hover:text-foreground";
   return (
-    <div className="flex items-center gap-1 rounded-full border border-border p-1">
-      <button
-        onClick={onDec}
-        aria-label="Decrease"
-        className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      >
-        <Minus weight="bold" className="size-4" />
+    <div className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-border-strong p-1">
+      <button onClick={onDec} aria-label="Decrease" className={stepButtonStyles}>
+        <Minus weight="bold" className="size-3.5" />
       </button>
-      <span className="min-w-14 text-center text-sm font-semibold tabular-nums">
+      <span className="min-w-[58px] text-center font-display text-[15px] font-extrabold tabular-nums">
         {value}
       </span>
-      <button
-        onClick={onInc}
-        aria-label="Increase"
-        className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      >
-        <Plus weight="bold" className="size-4" />
+      <button onClick={onInc} aria-label="Increase" className={stepButtonStyles}>
+        <Plus weight="bold" className="size-3.5" />
       </button>
     </div>
   );
@@ -134,7 +172,13 @@ const FONT_SIZES: { key: FontSize; label: string; px: string }[] = [
   { key: "lg", label: "Large", px: "18px" },
 ];
 
+const UNIT_OPTIONS: SegmentOption<"lb" | "kg">[] = [
+  { key: "lb", label: "LB" },
+  { key: "kg", label: "KG" },
+];
+
 export default function SettingsPage() {
+  const router = useRouter();
   const me = useQuery(api.users.me, {});
   const setUnits = useMutation(api.users.setUnits);
   const setPrefs = useMutation(api.users.setPreferences);
@@ -286,221 +330,197 @@ export default function SettingsPage() {
     [me?.firstName, me?.lastName].filter(Boolean).join(" ") ||
     user?.fullName ||
     "—";
-  const email =
-    me?.email || user?.primaryEmailAddress?.emailAddress || "—";
+  const email = me?.email || user?.primaryEmailAddress?.emailAddress || "—";
 
   return (
-    <div className="container-page flex max-w-xl flex-col gap-6 py-8">
-      <h1 className="text-3xl font-semibold tracking-tighter">Settings</h1>
+    <div className="container-page flex max-w-2xl flex-col gap-4 py-8">
+      {/* Mobile header — big title with a back caret. */}
+      <div className="flex items-center gap-2.5 sm:hidden">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          aria-label="Go back"
+          className="text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <CaretLeft weight="bold" className="size-5" />
+        </button>
+        <h1 className="font-display text-3xl font-black">SETTINGS</h1>
+      </div>
+
+      {/* Desktop header — mono eyebrow + big title. */}
+      <div className="hidden sm:block">
+        <p className="mono-label text-[11px] text-muted-foreground">PREFERENCES</p>
+        <h1 className="font-display text-4xl font-black leading-none">SETTINGS</h1>
+      </div>
 
       {/* Units */}
-      <section className="rounded-card border border-border bg-card p-5">
-        <h2 className="font-medium">Units</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Weight unit used across workouts and your body journal.
-        </p>
-        <div className="mt-4 inline-flex rounded-full border border-border p-1">
-          {UNITS.map((u) => (
-            <button
-              key={u}
-              onClick={() => {
-                if (u !== unit) setUnits({ units: u });
-              }}
-              className={`rounded-full px-6 py-2 text-sm font-medium uppercase transition-colors ${
-                unit === u
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {u}
-            </button>
-          ))}
+      <section className={cardStyles}>
+        <h3 className={cardTitleStyles}>Units</h3>
+        <div className={rowStyles}>
+          <div className="min-w-0">
+            <p className={rowLabelStyles}>Weight unit</p>
+            <p className={rowDescStyles}>Across workouts &amp; body journal.</p>
+          </div>
+          <Segmented
+            options={UNIT_OPTIONS}
+            value={unit}
+            onChange={(u) => {
+              if (u !== unit) setUnits({ units: u });
+            }}
+          />
         </div>
       </section>
 
       {/* Text size */}
-      <section className="rounded-card border border-border bg-card p-5">
-        <h2 className="font-medium">Text size</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Adjust how large text appears across the app.
-        </p>
-        <div className="mt-4 inline-flex rounded-full border border-border p-1">
-          {FONT_SIZES.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => applyFontSize(f.key)}
-              className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${
-                fontSize === f.key
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+      <section className={cardStyles}>
+        <h3 className={cardTitleStyles}>Text size</h3>
+        <Segmented options={FONT_SIZES} value={fontSize} onChange={applyFontSize} />
       </section>
 
       {/* Training */}
-      <section className="rounded-card border border-border bg-card p-5">
-        <h2 className="font-medium">Training</h2>
-        <div className="mt-4 flex flex-col gap-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Weekly goal</p>
-              <p className="text-xs text-muted-foreground">
-                Target workouts per week.
-              </p>
-            </div>
-            <Stepper
-              value={`${goal}`}
-              onDec={() => changeGoal(goal - 1)}
-              onInc={() => changeGoal(goal + 1)}
-            />
+      <section className={cardStyles}>
+        <h3 className={cardTitleStyles}>Training</h3>
+        <div className={rowStyles}>
+          <div className="min-w-0">
+            <p className={rowLabelStyles}>Weekly goal</p>
+            <p className={rowDescStyles}>Target workouts per week.</p>
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Default rest timer</p>
-              <p className="text-xs text-muted-foreground">
-                Starts automatically when you finish a set.
-              </p>
-            </div>
-            <Stepper
-              value={fmtRest(rest)}
-              onDec={() => changeRest(rest - 15)}
-              onInc={() => changeRest(rest + 15)}
-            />
+          <Stepper
+            value={`${goal}`}
+            onDec={() => changeGoal(goal - 1)}
+            onInc={() => changeGoal(goal + 1)}
+          />
+        </div>
+        <div className={rowStyles}>
+          <div className="min-w-0">
+            <p className={rowLabelStyles}>Default rest timer</p>
+            <p className={rowDescStyles}>
+              Starts automatically when you finish a set.
+            </p>
           </div>
+          <Stepper
+            value={fmtRest(rest)}
+            onDec={() => changeRest(rest - 15)}
+            onInc={() => changeRest(rest + 15)}
+          />
         </div>
       </section>
 
-      {/* Push reminders */}
+      {/* Reminders */}
+      <section className={cardStyles}>
+        <h3 className={cardTitleStyles}>Reminders</h3>
+        <div className={rowStyles}>
+          <div className="min-w-0">
+            <p className={rowLabelStyles}>Reminder time</p>
+            <p className={rowDescStyles}>Daily &amp; weekly, your local time.</p>
+          </div>
+          <Stepper
+            value={fmtHour(reminderHour)}
+            onDec={() => changeReminderHour(reminderHour - 1)}
+            onInc={() => changeReminderHour(reminderHour + 1)}
+          />
+        </div>
+        <ReminderRow
+          title="Daily exercise"
+          desc="A nudge to train if you've been inactive today."
+          on={rem.remindExercise}
+          onToggle={() => toggleReminder("remindExercise")}
+        />
+        <ReminderRow
+          title="Weekly weigh-in"
+          desc="A Monday reminder to log your body weight."
+          on={rem.remindWeighIn}
+          onToggle={() => toggleReminder("remindWeighIn")}
+        />
+        <ReminderRow
+          title="Rest timer done"
+          desc="Push when your rest timer reaches zero."
+          on={rem.remindRest}
+          onToggle={() => toggleReminder("remindRest")}
+        />
+      </section>
+
+      {/* Push reminders (device-level opt-in) */}
       <PushToggle />
 
-      {/* Reminders */}
-      <section className="rounded-card border border-border bg-card p-5">
-        <h2 className="font-medium">Reminders</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Choose which nudges you get (in-app bell + push, when enabled).
-        </p>
-        <div className="mt-4 flex flex-col gap-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Reminder time</p>
-              <p className="text-xs text-muted-foreground">
-                When daily &amp; weekly reminders are sent — your local time.
-              </p>
-            </div>
-            <Stepper
-              value={fmtHour(reminderHour)}
-              onDec={() => changeReminderHour(reminderHour - 1)}
-              onInc={() => changeReminderHour(reminderHour + 1)}
-            />
-          </div>
-          <ReminderRow
-            title="Daily exercise"
-            desc="A nudge to train (or log recovery) if you've been inactive today."
-            on={rem.remindExercise}
-            onToggle={() => toggleReminder("remindExercise")}
-          />
-          <ReminderRow
-            title="Weekly weigh-in"
-            desc="A Monday reminder to log your body weight."
-            on={rem.remindWeighIn}
-            onToggle={() => toggleReminder("remindWeighIn")}
-          />
-          <ReminderRow
-            title="Rest timer done"
-            desc="Push when your rest timer reaches zero."
-            on={rem.remindRest}
-            onToggle={() => toggleReminder("remindRest")}
-          />
+      {/* Export data */}
+      <section className={cardStyles}>
+        <h3 className={cardTitleStyles}>Export your data</h3>
+        <div className="flex flex-wrap gap-2.5">
+          <button
+            onClick={exportWorkouts}
+            disabled={exporting !== null}
+            className={steelButtonStyles}
+          >
+            <DownloadSimple weight="bold" className="size-4" />
+            {exporting === "workouts" ? "Exporting…" : "Workouts CSV"}
+          </button>
+          <button
+            onClick={exportBody}
+            disabled={exporting !== null}
+            className={steelButtonStyles}
+          >
+            <DownloadSimple weight="bold" className="size-4" />
+            {exporting === "body" ? "Exporting…" : "Body log CSV"}
+          </button>
         </div>
       </section>
 
       {/* Account */}
-      <section className="rounded-card border border-border bg-card p-5">
-        <h2 className="font-medium">Account</h2>
-        <dl className="mt-3 flex flex-col gap-2 text-sm">
+      <section className={cardStyles}>
+        <h3 className={cardTitleStyles}>Account</h3>
+        <dl className="flex flex-col gap-2 text-sm">
           <div className="flex justify-between gap-4">
             <dt className="text-muted-foreground">Name</dt>
-            <dd className="truncate font-medium">{name}</dd>
+            <dd className="truncate font-semibold">{name}</dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-muted-foreground">Email</dt>
-            <dd className="truncate font-medium">{email}</dd>
+            <dd className="truncate font-semibold">{email}</dd>
           </div>
         </dl>
-      </section>
-
-      {/* Export data */}
-      <section className="rounded-card border border-border bg-card p-5">
-        <h2 className="font-medium">Export your data</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Download a CSV of everything you&apos;ve logged.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            onClick={exportWorkouts}
-            disabled={exporting !== null}
+        <SignOutButton redirectUrl="/sign-in">
+          <button
+            className={`${steelButtonStyles} self-start`}
           >
-            <DownloadSimple className="size-4" />
-            {exporting === "workouts" ? "Exporting…" : "Workouts CSV"}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={exportBody}
-            disabled={exporting !== null}
-          >
-            <DownloadSimple className="size-4" />
-            {exporting === "body" ? "Exporting…" : "Body log CSV"}
-          </Button>
-        </div>
+            <SignOut weight="bold" className="size-4" />
+            Sign out
+          </button>
+        </SignOutButton>
       </section>
-
-      {/* Sign out */}
-      <SignOutButton redirectUrl="/sign-in">
-        <button className="flex items-center justify-center gap-2 self-start rounded-full border border-border px-5 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted">
-          <SignOut className="size-4" />
-          Sign out
-        </button>
-      </SignOutButton>
 
       {/* Danger zone */}
-      <section className="rounded-card border border-red-500/30 bg-card p-5">
-        <h2 className="font-medium text-red-600">Danger zone</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Permanently delete your account and all your workouts and body data.
-          This can&apos;t be undone.
+      <section className="flex flex-col gap-3 rounded-[16px] border border-red-500/30 bg-card p-5">
+        <h3 className={`${cardTitleStyles} text-red-500`}>Danger zone</h3>
+        <p className="text-xs leading-snug text-muted-foreground">
+          Permanently delete your account and all data. This cannot be undone.
         </p>
-        <Button
-          variant="danger-outline"
+        <button
           onClick={() => {
             setDeleteError(null);
             setConfirmDelete(true);
           }}
-          className="mt-4"
+          className="inline-flex items-center gap-2 self-start rounded-[10px] border border-red-500/40 px-4 py-3 font-mono text-xs uppercase tracking-[0.08em] text-red-500 transition-colors hover:bg-red-500/10"
         >
-          <TrashSimple className="size-4" />
+          <TrashSimple weight="bold" className="size-4" />
           Delete account
-        </Button>
+        </button>
       </section>
 
       {confirmDelete && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
           onClick={() => !deleting && setConfirmDelete(false)}
           role="dialog"
           aria-modal="true"
         >
           <div
-            className="w-full max-w-sm rounded-card border border-border bg-card p-6 shadow-xl"
+            className="w-full max-w-sm rounded-[16px] border border-border bg-card p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-2 text-red-600">
+            <div className="flex items-center gap-2 text-red-500">
               <WarningCircle weight="fill" className="size-5" />
-              <h2 className="text-lg font-semibold tracking-tight">
+              <h2 className="font-display text-lg font-extrabold">
                 Delete account?
               </h2>
             </div>
@@ -509,7 +529,7 @@ export default function SettingsPage() {
               body entry you&apos;ve logged. This cannot be undone.
             </p>
             {deleteError && (
-              <p className="mt-3 text-sm text-red-600">{deleteError}</p>
+              <p className="mt-3 text-sm text-red-500">{deleteError}</p>
             )}
             <div className="mt-6 flex justify-end gap-2">
               <Button
@@ -519,11 +539,7 @@ export default function SettingsPage() {
               >
                 Cancel
               </Button>
-              <Button
-                variant="danger"
-                onClick={handleDelete}
-                disabled={deleting}
-              >
+              <Button variant="danger" onClick={handleDelete} disabled={deleting}>
                 {deleting ? "Deleting…" : "Delete account"}
               </Button>
             </div>

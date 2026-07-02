@@ -8,14 +8,21 @@ import type { Id } from "@/convex/_generated/dataModel";
 import {
   MagnifyingGlass,
   Plus,
+  Minus,
   Trash,
   X,
   Check,
   CaretDown,
+  CaretLeft,
   Pause,
   Play,
   Barbell,
   Info,
+  PencilSimple,
+  Trophy,
+  Lightning,
+  FlagCheckered,
+  ArrowCounterClockwise,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -54,6 +61,30 @@ const inputBase =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const REST_DEFAULT = 90; // seconds
+
+// The steel diagonal-hatch tile used behind an exercise with no image.
+const tileGradientStyle = {
+  background: "repeating-linear-gradient(45deg,#1c1c22 0 6px,#17171b 6px 12px)",
+};
+
+// Repeated Tailwind class strings, pulled out so they stay easy to tweak.
+const collapsedRowStyles =
+  "scroll-mt-24 flex items-center gap-3 rounded-[14px] border border-border bg-card p-4";
+const activeCardStyles =
+  "scroll-mt-24 overflow-hidden rounded-2xl border border-border-strong bg-card";
+const stepperStyles =
+  "flex min-w-0 flex-1 items-center justify-between rounded-[10px] border border-border-strong bg-card p-1";
+const stepperButtonStyles =
+  "flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-bright transition-[filter] hover:brightness-125";
+const stepperInputStyles =
+  "min-w-0 flex-1 bg-transparent text-center font-display text-2xl font-black tabular-nums focus:outline-none";
+const finishBarStyles =
+  "flex w-full items-center justify-center gap-2.5 rounded-[14px] bg-accent px-4 py-4 " +
+  "font-display text-lg font-black italic tracking-tight text-accent-foreground " +
+  "transition-[filter] hover:brightness-105 disabled:pointer-events-none disabled:opacity-50";
+const dashedAddStyles =
+  "flex w-full items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed " +
+  "border-border-strong px-4 py-4 text-accent transition-colors hover:border-accent hover:bg-accent/5";
 
 export default function Page() {
   return (
@@ -298,17 +329,25 @@ function LogWorkout() {
   );
   const effBodyWeight = latestBodyWeight ?? me?.bodyWeight ?? 0;
 
-  // Look up an exercise's thumbnail / detail by name, for the added cards.
+  // Look up an exercise's thumbnail / detail / tags by name, for the added cards.
   const exerciseByName = useMemo(() => {
     const m = new Map<
       string,
-      { id: Id<"exercises">; image?: string; hasDetail: boolean }
+      {
+        id: Id<"exercises">;
+        image?: string;
+        hasDetail: boolean;
+        muscleGroup?: string;
+        equipment?: string;
+      }
     >();
     for (const e of allExercises ?? []) {
       m.set(e.name.toLowerCase(), {
         id: e._id,
         image: e.image,
         hasDetail: e.hasDetail,
+        muscleGroup: e.muscleGroup ?? undefined,
+        equipment: e.equipment ?? undefined,
       });
     }
     return m;
@@ -537,45 +576,143 @@ function LogWorkout() {
     e.sets.some((s) => !s.done && !canFinishSet(s)),
   );
 
+  // Live session stats for the header sub-line and desktop session rail.
+  const exerciseCount = entries.length;
+  const setsDoneCount = entries.reduce(
+    (total, entry) => total + entry.sets.filter((s) => s.done).length,
+    0,
+  );
+  const sessionVolume = entries.reduce(
+    (total, entry) =>
+      total +
+      entry.sets.reduce(
+        (n, s) => (s.done ? n + toNum(s.reps) * toNum(s.weight) : n),
+        0,
+      ),
+    0,
+  );
+  // Live PR count: exercises whose best done set beats their all-time best.
+  const newPrCount = entries.reduce((count, entry) => {
+    const best = bestByExercise.get(entry.name.toLowerCase());
+    if (best === undefined) return count;
+    const doneWeights = entry.sets
+      .filter((s) => s.done)
+      .map((s) => toNum(s.weight));
+    const bestDone = doneWeights.length ? Math.max(...doneWeights) : 0;
+    return bestDone > best ? count + 1 : count;
+  }, 0);
+
+  // Weight the ± stepper nudges by unit (5 lb / 2.5 kg per tap).
+  const weightStep = unit === "kg" ? 2.5 : 5;
+  function stepReps(entryId: string, s: SetRow, delta: number) {
+    const next = Math.max(0, toNum(s.reps) + delta);
+    updateSet(entryId, s.id, { reps: String(next) });
+  }
+  function stepWeight(entryId: string, s: SetRow, delta: number) {
+    const next = Math.max(0, round1(toNum(s.weight) + delta));
+    updateSet(entryId, s.id, { weight: String(next) });
+  }
+  // Copy the previous set's reps/weight into this set (the "repeat last" pill).
+  function repeatLastSet(entry: Entry, index: number) {
+    const previous = entry.sets[index - 1];
+    if (!previous) return;
+    updateSet(entry.id, entry.sets[index].id, {
+      reps: previous.reps,
+      weight: previous.weight,
+    });
+  }
+
+  const displayName = name.trim() || "Workout";
+  const sessionSubline = `${exerciseCount} ${
+    exerciseCount === 1 ? "EXERCISE" : "EXERCISES"
+  } · ${setsDoneCount} ${setsDoneCount === 1 ? "SET" : "SETS"} DONE`;
+
+  // Primary action switches per mode: edit → save, not started → start, else finish.
+  const primaryLabel = isEditing
+    ? "SAVE WORKOUT"
+    : !started
+      ? "START WORKOUT"
+      : "FINISH WORKOUT";
+  const PrimaryIcon = isEditing ? Check : !started ? Play : FlagCheckered;
+  const primaryAction = isEditing
+    ? requestFinish
+    : !started
+      ? startWorkout
+      : requestFinish;
+  const primaryDisabled = isEditing
+    ? saving || entries.length === 0
+    : !started
+      ? entries.length === 0
+      : saving || entries.length === 0;
+
   return (
-    <div className="container-page flex flex-col gap-6 py-8">
-      <div className="flex items-center gap-3">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          aria-label="Workout name"
-          className={`h-11 min-w-0 flex-1 text-lg font-semibold tracking-tight ${inputBase}`}
-        />
-        {elapsedSec !== null && (
-          <button
-            type="button"
-            onClick={paused ? resumeTimer : pauseTimer}
-            aria-label={paused ? "Resume session timer" : "Pause session timer"}
-            title={paused ? "Resume timer" : "Pause timer"}
-            className={`flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-medium tabular-nums transition-colors ${
-              paused
-                ? "border-accent-strong/40 text-accent-strong"
-                : "border-border text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {paused ? (
-              <Play weight="fill" className="size-4" />
-            ) : (
-              <Pause weight="fill" className="size-4 text-accent-strong" />
-            )}
-            {fmtDuration(elapsedSec)}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setPlateOpen(true)}
-          aria-label="Plate calculator"
-          title="Plate calculator"
-          className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <Barbell weight="bold" className="size-5" />
-        </button>
-      </div>
+    <div className="flex min-h-full flex-col md:flex-row">
+      {/* EXERCISES COLUMN */}
+      <div className="flex flex-1 flex-col px-5 py-6 sm:px-8 md:border-r md:border-border">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+          {/* Session header: back + editable name + live clock (mobile) */}
+          <header className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                aria-label="Back to home"
+                className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <CaretLeft weight="bold" className="size-5" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    aria-label="Workout name"
+                    className="min-w-0 flex-1 bg-transparent font-display text-2xl font-black uppercase tracking-tight focus:outline-none"
+                  />
+                  <PencilSimple className="size-4 shrink-0 text-dim" />
+                </div>
+                <p className="mono-label text-[10px] text-muted-foreground">
+                  {sessionSubline}
+                </p>
+              </div>
+            </div>
+
+            {/* Mobile-only clock pill + plate calc (desktop uses the rail) */}
+            <div className="flex shrink-0 items-center gap-2 md:hidden">
+              {elapsedSec !== null && (
+                <button
+                  type="button"
+                  onClick={paused ? resumeTimer : pauseTimer}
+                  aria-label={paused ? "Resume session timer" : "Pause session timer"}
+                  title={paused ? "Resume timer" : "Pause timer"}
+                  className="flex items-center gap-2 rounded-full border border-accent/35 bg-accent/10 px-3 py-2"
+                >
+                  <span
+                    className={`size-2 rounded-full bg-accent ${
+                      running ? "animate-pulse-dot" : ""
+                    }`}
+                  />
+                  <span className="font-mono text-base font-semibold tabular-nums text-accent">
+                    {fmtDuration(elapsedSec)}
+                  </span>
+                  {paused ? (
+                    <Play weight="fill" className="size-3.5 text-accent" />
+                  ) : (
+                    <Pause weight="fill" className="size-3.5 text-accent" />
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setPlateOpen(true)}
+                aria-label="Plate calculator"
+                title="Plate calculator"
+                className="flex size-10 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Barbell weight="bold" className="size-5" />
+              </button>
+            </div>
+          </header>
 
       <PlateCalculator
         open={plateOpen}
@@ -583,259 +720,494 @@ function LogWorkout() {
         onClose={() => setPlateOpen(false)}
       />
 
-      {/* Current workout */}
-      {entries.length > 0 && (
-        <section className="flex flex-col gap-3">
-          {entries.map((entry) => {
-            const best = bestByExercise.get(entry.name.toLowerCase());
-            const isOpen = expanded.has(entry.id);
-            const setCount = entry.sets.length;
-            const totalReps = entry.sets.reduce((n, s) => n + toNum(s.reps), 0);
-            const meta = exerciseByName.get(entry.name.toLowerCase());
-            return (
-              <div
-                key={entry.id}
-                id={`ex-${entry.id}`}
-                className="scroll-mt-20 rounded-card border border-border bg-card p-4"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleExpanded(entry.id)}
-                    aria-expanded={isOpen}
-                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          {/* Current workout */}
+          {entries.length > 0 && (
+            <section className="flex flex-col gap-3">
+              {entries.map((entry) => {
+                const best = bestByExercise.get(entry.name.toLowerCase());
+                const meta = exerciseByName.get(entry.name.toLowerCase());
+                const isOpen = expanded.has(entry.id);
+                const setCount = entry.sets.length;
+                const doneCount = entry.sets.filter((s) => s.done).length;
+                const totalReps = entry.sets.reduce(
+                  (n, s) => n + toNum(s.reps),
+                  0,
+                );
+                const tagLine = [meta?.equipment, meta?.muscleGroup]
+                  .filter(Boolean)
+                  .join(" · ")
+                  .toUpperCase();
+
+                // Before the workout starts, cards are compact planning rows
+                // with a remove button (sets can't be opened yet).
+                if (!started) {
+                  return (
+                    <div
+                      key={entry.id}
+                      id={`ex-${entry.id}`}
+                      className={collapsedRowStyles}
+                    >
+                      <ExerciseThumb image={meta?.image} size="sm" />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate font-display text-[15px] font-extrabold">
+                          {entry.name}
+                        </span>
+                        {tagLine && (
+                          <span className="mono-label text-[10px] text-muted-foreground">
+                            {tagLine}
+                          </span>
+                        )}
+                      </span>
+                      {meta?.hasDetail && (
+                        <HowToButton
+                          name={entry.name}
+                          onClick={() => setDetailId(meta.id)}
+                        />
+                      )}
+                      <IconButton
+                        variant="danger"
+                        onClick={() => removeExercise(entry.id)}
+                        aria-label={`Remove ${entry.name}`}
+                        title="Remove exercise"
+                      >
+                        <Trash className="size-4" />
+                      </IconButton>
+                    </div>
+                  );
+                }
+
+                // Started but collapsed: compact steel row with a summary.
+                if (!isOpen) {
+                  return (
+                    <div
+                      key={entry.id}
+                      id={`ex-${entry.id}`}
+                      className={collapsedRowStyles}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(entry.id)}
+                        aria-expanded={false}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <ExerciseThumb image={meta?.image} size="sm" />
+                        <span className="flex min-w-0 flex-col">
+                          <span className="truncate font-display text-[15px] font-extrabold">
+                            {entry.name}
+                          </span>
+                          <span className="mono-label text-[10px] text-muted-foreground">
+                            {setCount} {setCount === 1 ? "SET" : "SETS"} ·{" "}
+                            {doneCount === setCount
+                              ? `${totalReps} REPS`
+                              : "UP NEXT"}
+                          </span>
+                        </span>
+                      </button>
+                      {meta?.hasDetail && (
+                        <HowToButton
+                          name={entry.name}
+                          onClick={() => setDetailId(meta.id)}
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(entry.id)}
+                        aria-label="Expand exercise"
+                        aria-expanded={false}
+                        className="shrink-0 text-dim transition-colors hover:text-foreground"
+                      >
+                        <CaretDown weight="bold" className="size-5" />
+                      </button>
+                    </div>
+                  );
+                }
+
+                // Started + expanded: the full active card with steppers.
+                return (
+                  <div
+                    key={entry.id}
+                    id={`ex-${entry.id}`}
+                    className={activeCardStyles}
                   >
-                    {meta?.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={meta.image}
-                        alt=""
-                        loading="lazy"
-                        className="size-10 shrink-0 rounded-lg bg-white object-cover"
-                      />
-                    ) : null}
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate font-medium">{entry.name}</span>
-                      {!isOpen && started && (
-                        <span className="text-sm text-muted-foreground">
-                          {setCount} {setCount === 1 ? "set" : "sets"} ·{" "}
-                          {totalReps} {totalReps === 1 ? "rep" : "reps"}
+                    <div className="flex items-center gap-3 border-b border-muted p-4">
+                      <ExerciseThumb image={meta?.image} size="lg" />
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(entry.id)}
+                        aria-expanded
+                        className="flex min-w-0 flex-1 flex-col text-left"
+                      >
+                        <span className="truncate font-display text-[17px] font-extrabold">
+                          {entry.name}
+                        </span>
+                        {tagLine && (
+                          <span className="mono-label text-[10px] text-muted-foreground">
+                            {tagLine}
+                          </span>
+                        )}
+                      </button>
+                      {best !== undefined && (
+                        <span className="flex shrink-0 items-center gap-1.5 rounded-lg border border-spark/40 bg-spark/10 px-2 py-1">
+                          <Trophy weight="fill" className="size-3 text-spark" />
+                          <span className="mono-label text-[10px] text-spark-lite">
+                            BEST {round1(best)}
+                          </span>
                         </span>
                       )}
-                    </span>
-                  </button>
-                  {meta?.hasDetail && (
-                    <button
-                      type="button"
-                      onClick={() => setDetailId(meta.id)}
-                      aria-label={`How to do ${entry.name}`}
-                      title="How-to & instructions"
-                      className="shrink-0 text-muted-foreground transition-colors hover:text-accent-strong"
-                    >
-                      <Info className="size-5" />
-                    </button>
-                  )}
-                  {started ? (
-                    <button
-                      type="button"
-                      onClick={() => toggleExpanded(entry.id)}
-                      aria-label={isOpen ? "Collapse exercise" : "Expand exercise"}
-                      aria-expanded={isOpen}
-                      className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <CaretDown
-                        className={`size-5 transition-transform ${
-                          isOpen ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
-                  ) : (
-                    <IconButton
-                      variant="danger"
-                      onClick={() => removeExercise(entry.id)}
-                      aria-label={`Remove ${entry.name}`}
-                      title="Remove exercise"
-                    >
-                      <Trash className="size-4" />
-                    </IconButton>
-                  )}
-                </div>
+                      {meta?.hasDetail && (
+                        <HowToButton
+                          name={entry.name}
+                          onClick={() => setDetailId(meta.id)}
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(entry.id)}
+                        aria-label="Collapse exercise"
+                        aria-expanded
+                        className="shrink-0 text-dim transition-colors hover:text-foreground"
+                      >
+                        <CaretDown
+                          weight="bold"
+                          className="size-5 rotate-180"
+                        />
+                      </button>
+                    </div>
 
-                {/* Sets — only once the workout has started */}
-                {started && isOpen && (
-                <div className="mt-3 flex flex-col gap-2">
-                  <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
-                    <span className="w-8">Set</span>
-                    <span className="flex-1">Reps</span>
-                    <span className="flex-1">Weight ({unit})</span>
-                    {best !== undefined && (
-                      <span className="w-14 text-center leading-tight">
-                        vs best
-                        <span className="block text-[10px] font-normal text-muted-foreground/70">
-                          {round1(best)} {unit}
-                        </span>
+                    {/* Column head */}
+                    <div className="flex items-center gap-3 px-4 pb-1.5 pt-3">
+                      <span className="mono-label w-7 text-[9px] text-dim">
+                        SET
                       </span>
-                    )}
-                    <span className="w-7" />
-                  </div>
-                  {entry.sets.map((s, i) => {
-                    const delta =
-                      best !== undefined && s.weight.trim() !== ""
-                        ? toNum(s.weight) - best
-                        : null;
-                    return (
-                      <div key={s.id} className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSetDone(entry.id, s.id, !s.done)}
-                          aria-label={
-                            s.done
-                              ? `Mark set ${i + 1} incomplete`
-                              : `Mark set ${i + 1} complete`
-                          }
-                          className={`flex size-8 shrink-0 items-center justify-center rounded-md text-sm font-medium tabular-nums transition-colors ${
-                            s.done
-                              ? "bg-accent text-accent-foreground"
-                              : "text-muted-foreground hover:bg-muted"
-                          }`}
-                        >
-                          {s.done ? <Check weight="bold" className="size-4" /> : i + 1}
-                        </button>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min="0"
-                          placeholder="0"
-                          value={s.reps}
-                          onChange={(e) =>
-                            updateSet(entry.id, s.id, { reps: e.target.value })
-                          }
-                          aria-label={`Set ${i + 1} reps`}
-                          className={`h-11 w-full flex-1 tabular-nums ${inputBase}`}
-                        />
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          step="0.5"
-                          min="0"
-                          placeholder="0"
-                          value={s.weight}
-                          onChange={(e) =>
-                            updateSet(entry.id, s.id, { weight: e.target.value })
-                          }
-                          aria-label={`Set ${i + 1} weight`}
-                          className={`h-11 w-full flex-1 tabular-nums ${inputBase}`}
-                        />
-                        {best !== undefined && <DeltaBadge delta={delta} />}
-                        <button
-                          onClick={() => removeSet(entry.id, s.id)}
-                          aria-label={`Remove set ${i + 1}`}
-                          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-red-600"
-                        >
-                          <X className="size-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <IconButton
-                      variant="danger"
-                      onClick={() => removeExercise(entry.id)}
-                      aria-label={`Remove ${entry.name}`}
-                      title="Remove exercise"
-                    >
-                      <Trash className="size-4" />
-                    </IconButton>
-                    {(() => {
-                      // Finish the FIRST still-open set; stay on "Finish set"
-                      // until every set is done, then offer "Add set".
-                      const open = entry.sets.find((s) => !s.done);
-                      if (!open) {
+                      <span className="mono-label flex-1 text-center text-[9px] text-dim">
+                        REPS
+                      </span>
+                      <span className="mono-label flex-1 text-center text-[9px] text-dim">
+                        WEIGHT
+                      </span>
+                      <span className="mono-label w-9 text-right text-[9px] text-dim">
+                        DONE
+                      </span>
+                    </div>
+
+                    {/* Sets: done rows are dimmed; open sets get stepper panels */}
+                    {entry.sets.map((s, i) => {
+                      if (s.done) {
                         return (
-                          <button
-                            onClick={() => addSet(entry.id)}
-                            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-accent-strong transition-colors hover:bg-accent/10"
+                          <div
+                            key={s.id}
+                            className="flex items-center gap-3 px-4 py-1.5 opacity-55"
                           >
-                            <Plus weight="bold" className="size-4" />
-                            Add set
-                          </button>
+                            <span className="w-7 text-center font-display text-sm font-extrabold text-muted-foreground">
+                              {i + 1}
+                            </span>
+                            <span className="flex-1 text-center font-display text-lg font-extrabold tabular-nums">
+                              {s.reps || 0}
+                            </span>
+                            <span className="flex-1 text-center font-display text-lg font-extrabold tabular-nums">
+                              {s.weight || 0}
+                              <span className="font-mono text-[10px] font-normal text-muted-foreground">
+                                {" "}
+                                {unit}
+                              </span>
+                            </span>
+                            <span className="flex w-9 justify-end">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSetDone(entry.id, s.id, false)
+                                }
+                                aria-label={`Mark set ${i + 1} incomplete`}
+                                className="flex size-8 items-center justify-center rounded-lg bg-accent text-accent-foreground"
+                              >
+                                <Check weight="bold" className="size-4" />
+                              </button>
+                            </span>
+                          </div>
                         );
                       }
+
+                      const delta =
+                        best !== undefined && s.weight.trim() !== ""
+                          ? toNum(s.weight) - best
+                          : null;
+                      const previous = i > 0 ? entry.sets[i - 1] : null;
+                      const hasPrevData =
+                        !!previous &&
+                        (previous.reps.trim() !== "" ||
+                          previous.weight.trim() !== "");
+
                       return (
-                        <button
-                          onClick={() => setSetDone(entry.id, open.id, true)}
-                          disabled={!canFinishSet(open)}
-                          title={
-                            canFinishSet(open) ? undefined : "Enter reps first"
-                          }
-                          className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-accent"
+                        <div
+                          key={s.id}
+                          className="mx-3 mb-3 rounded-xl border border-accent bg-surface-3 p-3 shadow-[0_0_0_3px_rgba(215,242,74,0.1)]"
                         >
-                          <Check weight="bold" className="size-4" />
-                          Finish set
-                        </button>
+                          <div className="flex items-center gap-2">
+                            <span className="w-7 text-center font-display text-base font-black text-accent">
+                              {i + 1}
+                            </span>
+                            {/* Reps ± stepper */}
+                            <div className={stepperStyles}>
+                              <button
+                                type="button"
+                                onClick={() => stepReps(entry.id, s, -1)}
+                                aria-label={`Decrease set ${i + 1} reps`}
+                                className={stepperButtonStyles}
+                              >
+                                <Minus weight="bold" className="size-3.5" />
+                              </button>
+                              <input
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={s.reps}
+                                onChange={(e) =>
+                                  updateSet(entry.id, s.id, {
+                                    reps: e.target.value,
+                                  })
+                                }
+                                aria-label={`Set ${i + 1} reps`}
+                                className={stepperInputStyles}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => stepReps(entry.id, s, 1)}
+                                aria-label={`Increase set ${i + 1} reps`}
+                                className={stepperButtonStyles}
+                              >
+                                <Plus weight="bold" className="size-3.5" />
+                              </button>
+                            </div>
+                            {/* Weight ± stepper */}
+                            <div className={stepperStyles}>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  stepWeight(entry.id, s, -weightStep)
+                                }
+                                aria-label={`Decrease set ${i + 1} weight`}
+                                className={stepperButtonStyles}
+                              >
+                                <Minus weight="bold" className="size-3.5" />
+                              </button>
+                              <input
+                                inputMode="decimal"
+                                placeholder="0"
+                                value={s.weight}
+                                onChange={(e) =>
+                                  updateSet(entry.id, s.id, {
+                                    weight: e.target.value,
+                                  })
+                                }
+                                aria-label={`Set ${i + 1} weight`}
+                                className={stepperInputStyles}
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  stepWeight(entry.id, s, weightStep)
+                                }
+                                aria-label={`Increase set ${i + 1} weight`}
+                                className={stepperButtonStyles}
+                              >
+                                <Plus weight="bold" className="size-3.5" />
+                              </button>
+                            </div>
+                            {/* DONE check */}
+                            <span className="flex w-9 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => setSetDone(entry.id, s.id, true)}
+                                disabled={!canFinishSet(s)}
+                                title={
+                                  canFinishSet(s) ? undefined : "Enter reps first"
+                                }
+                                aria-label={`Mark set ${i + 1} complete`}
+                                className="flex size-9 items-center justify-center rounded-lg border-[1.5px] border-border-strong text-dim transition-colors hover:border-accent hover:text-accent disabled:opacity-40 disabled:hover:border-border-strong disabled:hover:text-dim"
+                              >
+                                <Check weight="bold" className="size-4" />
+                              </button>
+                            </span>
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            {hasPrevData && previous ? (
+                              <button
+                                type="button"
+                                onClick={() => repeatLastSet(entry, i)}
+                                className="mono-label flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5 text-[10px] text-bright transition-[filter] hover:brightness-125"
+                              >
+                                <ArrowCounterClockwise
+                                  weight="bold"
+                                  className="size-3"
+                                />
+                                REPEAT LAST · {toNum(previous.reps)}×
+                                {toNum(previous.weight)}
+                              </button>
+                            ) : (
+                              <span />
+                            )}
+                            <div className="flex items-center gap-2">
+                              <VsBestChip delta={delta} />
+                              {setCount > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeSet(entry.id, s.id)}
+                                  aria-label={`Remove set ${i + 1}`}
+                                  className="flex size-7 items-center justify-center rounded-lg text-dim transition-colors hover:bg-muted hover:text-red-500"
+                                >
+                                  <X className="size-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       );
-                    })()}
+                    })}
+
+                    {/* Card footer: remove exercise + add set */}
+                    <div className="flex items-center justify-between gap-2 px-4 pb-4 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => removeExercise(entry.id)}
+                        aria-label={`Remove ${entry.name}`}
+                        title="Remove exercise"
+                        className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium text-dim transition-colors hover:bg-red-500/10 hover:text-red-500"
+                      >
+                        <Trash weight="bold" className="size-4" />
+                        Remove
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => addSet(entry.id)}
+                        className="mono-label flex items-center gap-1.5 rounded-full border border-border-strong px-3.5 py-2 text-[11px] text-accent transition-colors hover:bg-accent/10"
+                      >
+                        <Plus weight="bold" className="size-3.5" />
+                        ADD SET
+                      </button>
+                    </div>
                   </div>
-                </div>
-                )}
-              </div>
-            );
-          })}
-        </section>
-      )}
+                );
+              })}
+            </section>
+          )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-500">{error}</p>}
 
-      {/* Add exercise — opens the library picker */}
-      <button
-        onClick={() => setPickerOpen(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-full border border-border px-4 py-4 text-sm font-medium text-accent-strong transition-colors hover:border-accent-strong/50 hover:bg-accent/5"
-      >
-        <Plus weight="bold" className="size-5" />
-        Add exercise
-      </button>
+          {/* Add exercise — opens the library picker */}
+          <button onClick={() => setPickerOpen(true)} className={dashedAddStyles}>
+            <Plus weight="bold" className="size-4" />
+            <span className="mono-label text-xs">ADD EXERCISE</span>
+          </button>
 
-      {/* Start the session, then finish it (edit mode just saves) */}
-      {isEditing ? (
-        <Button
-          onClick={requestFinish}
-          disabled={saving || entries.length === 0}
-          className="w-full"
-        >
-          <Check weight="bold" className="size-4" />
-          Save workout
-        </Button>
-      ) : !started ? (
-        <Button
-          onClick={startWorkout}
-          disabled={entries.length === 0}
-          className="w-full"
-        >
-          <Play weight="fill" className="size-4" />
-          Start workout
-        </Button>
-      ) : (
-        <Button
-          onClick={requestFinish}
-          disabled={saving || entries.length === 0}
-          className="w-full"
-        >
-          <Check weight="bold" className="size-4" />
-          Finish workout
-        </Button>
-      )}
+          {/* Mobile action bar: primary action + discard (desktop uses rail) */}
+          <div className="mt-2 flex flex-col gap-3 md:hidden">
+            <button
+              type="button"
+              onClick={primaryAction}
+              disabled={primaryDisabled}
+              className={finishBarStyles}
+            >
+              <PrimaryIcon
+                weight={PrimaryIcon === Play ? "fill" : "bold"}
+                className="size-5"
+              />
+              {primaryLabel}
+            </button>
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={() => setDiscardOpen(true)}
+                disabled={saving}
+                className="flex items-center justify-center gap-1.5 self-center rounded-xl px-4 py-2 text-sm font-medium text-red-500 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+              >
+                <Trash weight="bold" className="size-4" />
+                Discard workout
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
 
-      {!isEditing && (
-        <Button
-          variant="danger-outline"
-          onClick={() => setDiscardOpen(true)}
-          disabled={saving}
-          className="self-center"
+      {/* SESSION RAIL — desktop only */}
+      <aside className="hidden w-[250px] shrink-0 flex-col gap-4 bg-surface-2 px-5 py-6 md:flex">
+        <button
+          type="button"
+          onClick={started ? (paused ? resumeTimer : pauseTimer) : undefined}
+          disabled={!started}
+          title={
+            !started
+              ? "Start the workout to run the clock"
+              : paused
+                ? "Resume timer"
+                : "Pause timer"
+          }
+          className="rounded-[14px] border border-border-strong bg-card px-4 py-5 text-center transition-colors enabled:hover:bg-muted"
         >
-          <Trash weight="bold" className="size-4" />
-          Discard workout
-        </Button>
-      )}
+          <span className="mb-2 flex items-center justify-center gap-2">
+            <span
+              className={`size-2 rounded-full ${
+                running
+                  ? "animate-pulse-dot bg-accent"
+                  : started
+                    ? "bg-accent"
+                    : "bg-dim"
+              }`}
+            />
+            <span className="mono-label text-[10px] text-muted-foreground">
+              {paused ? "PAUSED" : "SESSION"}
+            </span>
+          </span>
+          <span className="block font-mono text-4xl font-semibold tabular-nums text-accent">
+            {fmtDuration(elapsedSec ?? 0)}
+          </span>
+        </button>
+
+        <div className="flex flex-col gap-2.5">
+          <RailStat label="VOLUME" value={sessionVolume.toLocaleString()} />
+          <RailStat label="SETS DONE" value={setsDoneCount} />
+          <RailStat
+            label="NEW PR"
+            value={newPrCount}
+            spark
+            icon={<Trophy weight="fill" className="size-3" />}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setPlateOpen(true)}
+          className="mono-label flex w-full items-center justify-center gap-2 rounded-[11px] border border-border-strong bg-card px-4 py-3 text-[11px] text-bright transition-colors hover:bg-muted"
+        >
+          <Barbell className="size-4" />
+          PLATE CALC
+        </button>
+
+        <div className="mt-auto flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={primaryAction}
+            disabled={primaryDisabled}
+            className={`${finishBarStyles} text-base`}
+          >
+            <PrimaryIcon
+              weight={PrimaryIcon === Play ? "fill" : "bold"}
+              className="size-5"
+            />
+            {primaryLabel}
+          </button>
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={() => setDiscardOpen(true)}
+              disabled={saving}
+              className="flex items-center justify-center gap-1.5 self-center rounded-xl px-4 py-2 text-sm font-medium text-red-500 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+            >
+              <Trash weight="bold" className="size-4" />
+              Discard
+            </button>
+          )}
+        </div>
+      </aside>
 
       {/* Exercise picker modal */}
       {pickerOpen && (
@@ -853,7 +1225,7 @@ function LogWorkout() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-2 border-b border-border p-4">
-              <h2 className="font-semibold tracking-tight">Add exercise</h2>
+              <h2 className="font-display text-lg font-black">Add exercise</h2>
               <button
                 onClick={() => {
                   setPickerOpen(false);
@@ -954,14 +1326,19 @@ function LogWorkout() {
                               className="size-12 shrink-0 rounded-lg bg-white object-cover"
                             />
                           ) : (
-                            <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-muted">
-                              <Barbell className="size-5 text-muted-foreground" />
+                            <span
+                              style={tileGradientStyle}
+                              className="flex size-12 shrink-0 items-center justify-center rounded-lg text-dim"
+                            >
+                              <Barbell className="size-5" />
                             </span>
                           )}
                           <span className="flex min-w-0 flex-col">
-                            <span className="truncate font-medium">{ex.name}</span>
+                            <span className="truncate font-display font-extrabold">
+                              {ex.name}
+                            </span>
                             {ex.muscleGroup && (
-                              <span className="text-xs capitalize text-muted-foreground">
+                              <span className="mono-label text-[10px] text-muted-foreground">
                                 {ex.muscleGroup}
                               </span>
                             )}
@@ -1014,7 +1391,7 @@ function LogWorkout() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-2 border-b border-border p-4">
-              <h2 className="truncate font-semibold tracking-tight">
+              <h2 className="truncate font-display text-lg font-black">
                 {detail?.name ?? "Exercise"}
               </h2>
               <button
@@ -1106,9 +1483,7 @@ function LogWorkout() {
             className="w-full max-w-sm rounded-card border border-border bg-card p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold tracking-tight">
-              Finish your set
-            </h2>
+            <h2 className="font-display text-xl font-black">Finish your set</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               You still have an unfinished set in{" "}
               <span className="font-medium text-foreground">
@@ -1143,9 +1518,9 @@ function LogWorkout() {
             className="w-full max-w-sm rounded-card border border-border bg-card p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-2 text-red-600">
+            <div className="flex items-center gap-2 text-red-500">
               <Trash weight="fill" className="size-5" />
-              <h2 className="text-lg font-semibold tracking-tight">
+              <h2 className="font-display text-xl font-black">
                 Discard workout?
               </h2>
             </div>
@@ -1177,7 +1552,7 @@ function LogWorkout() {
             className="w-full max-w-sm rounded-card border border-border bg-card p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold tracking-tight">
+            <h2 className="font-display text-xl font-black">
               {isEditing ? "Save changes?" : "Finish workout?"}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -1186,7 +1561,7 @@ function LogWorkout() {
               exercise{entries.length === 1 ? "" : "s"}
               {isEditing ? " in" : " to"} your history?
             </p>
-            {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+            {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
             <div className="mt-6 flex justify-end gap-2">
               <Button
                 variant="secondary"
@@ -1210,26 +1585,104 @@ function LogWorkout() {
   );
 }
 
-function DeltaBadge({ delta }: { delta: number | null }) {
-  if (delta === null) return <span className="w-14" />;
-  const r = Math.round(delta * 10) / 10;
-  if (r === 0) {
+// The diagonal-hatch tile (or the real image) shown beside an exercise name.
+function ExerciseThumb({
+  image,
+  size,
+}: {
+  image?: string;
+  size: "sm" | "lg";
+}) {
+  const sizeClass = size === "lg" ? "size-11" : "size-10";
+  if (image) {
     return (
-      <span className="w-14 text-center text-xs font-medium tabular-nums text-muted-foreground">
-        ±0
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={image}
+        alt=""
+        loading="lazy"
+        className={`${sizeClass} shrink-0 rounded-[10px] bg-white object-cover`}
+      />
+    );
+  }
+  return (
+    <span
+      style={tileGradientStyle}
+      className={`flex ${sizeClass} shrink-0 items-center justify-center rounded-[10px] text-dim`}
+    >
+      <Barbell className="size-5" />
+    </span>
+  );
+}
+
+function HowToButton({ name, onClick }: { name: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`How to do ${name}`}
+      title="How-to & instructions"
+      className="shrink-0 text-muted-foreground transition-colors hover:text-accent"
+    >
+      <Info className="size-5" />
+    </button>
+  );
+}
+
+// The live "vs best" spark chip shown on the active set.
+function VsBestChip({ delta }: { delta: number | null }) {
+  if (delta === null) return null;
+  const rounded = Math.round(delta * 10) / 10;
+  if (rounded === 0) return null;
+  if (rounded > 0) {
+    return (
+      <span className="flex items-center gap-1 rounded-full bg-spark/10 px-2.5 py-1.5">
+        <Lightning weight="fill" className="size-3 text-spark" />
+        <span className="mono-label text-[10px] text-spark-lite">
+          +{rounded} vs BEST
+        </span>
       </span>
     );
   }
-  const up = r > 0;
   return (
-    <span
-      className={`w-14 text-center text-xs font-semibold tabular-nums ${
-        up ? "text-accent-strong" : "text-red-600"
-      }`}
-    >
-      {up ? "+" : ""}
-      {r}
+    <span className="mono-label rounded-full bg-muted px-2.5 py-1.5 text-[10px] tabular-nums text-muted-foreground">
+      {rounded}
     </span>
+  );
+}
+
+// A label/value row in the desktop session rail.
+function RailStat({
+  label,
+  value,
+  spark = false,
+  icon,
+}: {
+  label: string;
+  value: React.ReactNode;
+  spark?: boolean;
+  icon?: React.ReactNode;
+}) {
+  const wrapStyles = spark
+    ? "border-spark/40 bg-spark/[0.08]"
+    : "border-border bg-card";
+  const labelStyles = spark ? "text-spark-lite" : "text-muted-foreground";
+  return (
+    <div
+      className={`flex items-center justify-between rounded-[11px] border px-3.5 py-3 ${wrapStyles}`}
+    >
+      <span
+        className={`mono-label flex items-center gap-1.5 text-[10px] ${labelStyles}`}
+      >
+        {icon}
+        {label}
+      </span>
+      <span
+        className={`font-display text-xl font-black ${spark ? "text-spark" : ""}`}
+      >
+        {value}
+      </span>
+    </div>
   );
 }
 

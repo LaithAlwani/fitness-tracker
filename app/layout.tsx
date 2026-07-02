@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Archivo } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "./providers";
 import { RegisterSW } from "@/components/register-sw";
@@ -16,15 +16,22 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Archivo is the loud "display" face used for headline numbers, wordmark, and
+// big titles. It carries an italic used for the slanted hero words.
+const archivo = Archivo({
+  variable: "--font-archivo",
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800", "900"],
+  style: ["normal", "italic"],
+});
+
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"),
   title: "Liftify — Track workouts fast",
   description: "Log workouts in seconds and watch your progress over time.",
   manifest: "/manifest.webmanifest",
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/apple-icon.png", // iOS home-screen + splash icon (logo on dark)
-  },
+  // Favicon + iOS icon come from the file conventions app/icon.png and
+  // app/apple-icon.png (the volt logo mark), so no manual icons map is needed.
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -33,7 +40,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0f",
+  themeColor: "#0a0a0c",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -50,19 +57,19 @@ export default function RootLayout({
       signUpFallbackRedirectUrl="/"
       appearance={{
         variables: {
-          colorPrimary: "#8b5cf6",
-          colorBackground: "#16161f",
-          colorText: "#fafafa",
-          colorInputBackground: "#0a0a0f",
-          colorInputText: "#fafafa",
-          colorNeutral: "#fafafa",
+          colorPrimary: "#d7f24a",
+          colorBackground: "#141417",
+          colorText: "#f4f4f2",
+          colorInputBackground: "#0a0a0c",
+          colorInputText: "#f4f4f2",
+          colorNeutral: "#f4f4f2",
         },
       }}
     >
       <html
         lang="en"
         suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} h-full antialiased`}
       >
         <body className="min-h-full flex flex-col">
           <AppleSplash />

@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 export function ProgressRing({
   value,
   max,
@@ -10,7 +12,7 @@ export function ProgressRing({
   max: number;
   size?: number;
   stroke?: number;
-  label: string;
+  label: ReactNode;
   sublabel?: string;
 }) {
   const pct = max > 0 ? Math.min(1, value / max) : 0;
@@ -46,9 +48,13 @@ export function ProgressRing({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-semibold tabular-nums">{label}</span>
+        <span className="font-display text-3xl font-black leading-none tabular-nums">
+          {label}
+        </span>
         {sublabel && (
-          <span className="mt-0.5 text-xs text-muted-foreground">{sublabel}</span>
+          <span className="mono-label mt-1 text-[9px] text-muted-foreground">
+            {sublabel}
+          </span>
         )}
       </div>
     </div>

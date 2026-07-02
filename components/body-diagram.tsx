@@ -68,7 +68,7 @@ export function BodyDiagram({
             data={data}
             type="anterior"
             bodyColor="#52525b"
-            highlightedColors={["#8b5cf6"]}
+            highlightedColors={["#d7f24a"]}
             style={{ width: "100%" }}
           />
         </div>

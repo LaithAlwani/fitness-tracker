@@ -70,7 +70,7 @@ export function Onboarding({
       >
         <div className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.webp" alt="" className="size-8" />
+          <img src="/logo-mark.png" alt="" className="size-8" />
           <h2 className="text-lg font-semibold tracking-tight">
             Welcome to Liftify
           </h2>

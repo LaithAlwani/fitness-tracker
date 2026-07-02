@@ -32,7 +32,7 @@ export default function AuthLayout({
           className="relative flex items-center gap-2 text-lg font-semibold tracking-tight"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.webp" alt="" className="size-9 rounded-lg" />
+          <img src="/logo-mark.png" alt="" className="size-9 rounded-lg" />
           Liftify
         </Link>
 

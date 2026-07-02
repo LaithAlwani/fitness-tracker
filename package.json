@@ -13,6 +13,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "shop:gen": "node scripts/gen-shop.mjs",
     "convex": "convex dev",
     "convex:deploy": "convex deploy"
   },

@@ -1,32 +1,45 @@
 import type { ReactNode } from "react";
 
+// A scoreboard-style stat tile: a small mono label with an inline icon, then a
+// loud Archivo-black number. The "spark" variant (orange) is used for streaks.
 export function StatCard({
   label,
   value,
-  sublabel,
+  unit,
   icon,
+  variant = "default",
 }: {
   label: string;
   value: ReactNode;
-  sublabel?: string;
+  unit?: string;
   icon?: ReactNode;
+  variant?: "default" | "spark";
 }) {
+  const isSpark = variant === "spark";
+  const cardStyles = `rounded-[14px] border bg-card p-3.5 sm:p-4 ${
+    isSpark ? "border-spark/40" : "border-border"
+  }`;
+  const labelStyles = `mono-label flex items-center gap-1.5 text-[9px] sm:text-[10px] ${
+    isSpark ? "text-spark-lite" : "text-muted-foreground"
+  }`;
+  const valueStyles = `font-display text-3xl font-black leading-none sm:text-4xl ${
+    isSpark ? "text-spark" : ""
+  }`;
+
   return (
-    <div className="rounded-card border border-border bg-card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        {icon && (
-          <span className="flex size-8 items-center justify-center rounded-lg bg-accent/15 text-accent-strong">
-            {icon}
+    <div className={cardStyles}>
+      <span className={labelStyles}>
+        {icon}
+        {label}
+      </span>
+      <span className="mt-2 flex items-baseline gap-1.5">
+        <span className={valueStyles}>{value}</span>
+        {unit && (
+          <span className="font-mono text-[11px] text-muted-foreground sm:text-xs">
+            {unit}
           </span>
         )}
-      </div>
-      <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">
-        {value}
-      </p>
-      {sublabel && (
-        <p className="mt-0.5 text-xs text-muted-foreground">{sublabel}</p>
-      )}
+      </span>
     </div>
   );
 }

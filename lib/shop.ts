@@ -1,82 +1,58 @@
-// Amazon Associates shop config. Set your tag in NEXT_PUBLIC_AMAZON_TAG and fill
-// each product's `asin` (or a full `url`) with your affiliate links.
+// Amazon Associates shop config.
+//
+// You don't edit the product list by hand. Instead:
+//   1. Add your links + categories to `scripts/shop-input.mjs`
+//   2. Run `npm run shop:gen` — it follows each link, grabs the ASIN + title +
+//      image, and rewrites the SHOP_PRODUCTS block below.
+//
+// Set your associate tag in NEXT_PUBLIC_AMAZON_TAG. If your store isn't .com,
+// set NEXT_PUBLIC_AMAZON_DOMAIN (e.g. "amazon.ca").
 export const AMAZON_TAG = process.env.NEXT_PUBLIC_AMAZON_TAG || "";
+export const AMAZON_DOMAIN = process.env.NEXT_PUBLIC_AMAZON_DOMAIN || "amazon.com";
 
 export type ShopProduct = {
   id: string;
   title: string;
-  blurb: string;
   category: string;
+  blurb?: string;
   price?: string;
-  asin?: string; // Amazon ASIN — preferred; the tag is appended automatically
+  image?: string; // product image URL
+  asin?: string; // Amazon ASIN — the tag is appended automatically
   url?: string; // full URL override (used as-is)
 };
 
-// Placeholder catalog — swap titles/blurbs/ASINs for your real picks.
+// shop:generated:start — managed by scripts/gen-shop.mjs; do not edit by hand
 export const SHOP_PRODUCTS: ShopProduct[] = [
   {
     id: "belt",
     title: "Lever Lifting Belt",
-    blurb: "10mm support for heavy squats and deadlifts.",
     category: "Support",
-    asin: "",
+    blurb: "10mm support for heavy squats and deadlifts.",
   },
   {
     id: "wraps",
     title: "Wrist Wraps",
+    category: "Support",
     blurb: "Stiff wraps for pressing and overhead work.",
-    category: "Support",
-    asin: "",
-  },
-  {
-    id: "sleeves",
-    title: "Knee Sleeves (7mm)",
-    blurb: "Warmth and rebound out of the hole.",
-    category: "Support",
-    asin: "",
-  },
-  {
-    id: "chalk",
-    title: "Liquid Chalk",
-    blurb: "Grip that lasts without the mess.",
-    category: "Grip",
-    asin: "",
-  },
-  {
-    id: "straps",
-    title: "Lifting Straps",
-    blurb: "Hold onto heavier pulls for more back gains.",
-    category: "Grip",
-    asin: "",
   },
   {
     id: "creatine",
     title: "Creatine Monohydrate",
-    blurb: "The most studied strength supplement, 5g/day.",
     category: "Supplements",
-    asin: "",
+    blurb: "The most studied strength supplement, 5g/day.",
   },
   {
     id: "shaker",
     title: "Protein Shaker",
+    category: "Gear",
     blurb: "Leak-proof bottle with a blender ball.",
-    category: "Gear",
-    asin: "",
-  },
-  {
-    id: "bands",
-    title: "Resistance Bands Set",
-    blurb: "Warm-ups, assistance reps, and mobility.",
-    category: "Gear",
-    asin: "",
   },
 ];
+// shop:generated:end
 
 export function productUrl(p: ShopProduct): string | null {
   if (p.url) return p.url;
-  if (p.asin && AMAZON_TAG) {
-    return `https://www.amazon.com/dp/${p.asin}?tag=${AMAZON_TAG}`;
-  }
-  if (p.asin) return `https://www.amazon.com/dp/${p.asin}`;
-  return null; // not configured yet
+  if (!p.asin) return null; // not configured yet
+  const base = `https://www.${AMAZON_DOMAIN}/dp/${p.asin}`;
+  return AMAZON_TAG ? `${base}?tag=${AMAZON_TAG}` : base;
 }

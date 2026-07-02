@@ -7,16 +7,20 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
-  ArrowLeft,
   ArrowsClockwise,
+  Barbell,
+  CaretLeft,
+  ChartBar,
   PencilSimple,
-  Trash,
+  Stack,
+  TrashSimple,
   WarningCircle,
 } from "@phosphor-icons/react";
-import { Button, buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import { StatCard } from "@/components/ui/stat-card";
 
-function fmtDate(ms: number) {
+function formatDate(ms: number) {
   return new Date(ms).toLocaleDateString(undefined, {
     weekday: "long",
     month: "long",
@@ -25,12 +29,16 @@ function fmtDate(ms: number) {
   });
 }
 
-function fmtDuration(sec: number) {
-  const m = Math.round(sec / 60);
-  if (m < 1) return "<1 min";
-  if (m < 60) return `${m} min`;
-  return `${Math.floor(m / 60)}h ${m % 60}m`;
+function formatDuration(sec: number) {
+  const totalMinutes = Math.round(sec / 60);
+  if (totalMinutes < 1) return "<1 min";
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
 }
+
+const exerciseCardStyles = "rounded-[14px] border border-border bg-card p-4";
+const editButtonStyles =
+  "flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
 export default function WorkoutDetailPage() {
   const params = useParams();
@@ -60,94 +68,129 @@ export default function WorkoutDetailPage() {
   if (workout === undefined) {
     return (
       <div className="container-page py-8">
-        <div className="h-40 animate-pulse rounded-card bg-muted" />
+        <div className="h-40 animate-pulse rounded-[14px] border border-border bg-card" />
       </div>
     );
   }
   if (workout === null) {
     return (
-      <div className="container-page py-16 text-center text-muted-foreground">
-        Workout not found.{" "}
-        <Link href="/history" className="font-medium underline">
+      <div className="container-page py-16 text-center">
+        <p className="mono-label text-[10px] text-dim">Not found</p>
+        <p className="mt-2 text-muted-foreground">
+          This workout no longer exists.
+        </p>
+        <Link
+          href="/history"
+          className="mt-3 inline-block font-display text-lg font-black text-accent"
+        >
           Back to history
         </Link>
       </div>
     );
   }
 
-  const totalSets = workout.exercises.reduce((n, e) => n + e.sets.length, 0);
+  const totalSets = workout.exercises.reduce(
+    (count, exercise) => count + exercise.sets.length,
+    0,
+  );
   const totalVolume = Math.round(
     workout.exercises.reduce(
-      (s, e) => s + e.sets.reduce((ss, set) => ss + set.reps * set.weight, 0),
+      (sum, exercise) =>
+        sum +
+        exercise.sets.reduce(
+          (setSum, set) => setSum + set.reps * set.weight,
+          0,
+        ),
       0,
     ),
   );
+
+  const dateLine =
+    formatDate(workout.date) +
+    (workout.durationSec ? ` · ${formatDuration(workout.durationSec)}` : "");
 
   return (
     <div className="container-page flex flex-col gap-6 py-8">
       <Link
         href="/history"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="mono-label inline-flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
       >
-        <ArrowLeft className="size-4" />
+        <CaretLeft weight="bold" className="size-3.5" />
         History
       </Link>
 
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tighter">
+        <div className="min-w-0">
+          <h1 className="font-display text-3xl font-black md:text-4xl">
             {workout.name}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {fmtDate(workout.date)}
-            {workout.durationSec ? ` · ${fmtDuration(workout.durationSec)}` : ""}
+          <p className="mt-1 font-mono text-xs text-muted-foreground">
+            {dateLine}
           </p>
         </div>
         <div className="flex items-center gap-1">
           <Link
             href={`/workout/new?edit=${workout._id}`}
             aria-label="Edit workout"
-            className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            title="Edit workout"
+            className={editButtonStyles}
           >
-            <PencilSimple className="size-5" />
+            <PencilSimple weight="bold" className="size-5" />
           </Link>
           <IconButton
             variant="danger"
             onClick={() => setConfirmDelete(true)}
             aria-label="Delete workout"
           >
-            <Trash className="size-5" />
+            <TrashSimple weight="bold" className="size-5" />
           </IconButton>
         </div>
       </div>
 
       <Link
         href={`/workout/new?repeat=${workout._id}`}
-        className={buttonClass("primary", "md", "w-full")}
+        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-accent font-display font-black italic text-accent-foreground transition-[filter] hover:brightness-105 active:translate-y-px"
       >
-        <ArrowsClockwise weight="bold" className="size-4" />
-        Repeat this workout
+        <ArrowsClockwise weight="bold" className="size-5" />
+        REPEAT THIS WORKOUT
       </Link>
 
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Exercises" value={String(workout.exercises.length)} />
-        <Stat label="Sets" value={String(totalSets)} />
-        <Stat label={`Volume (${unit})`} value={String(totalVolume)} />
+        <StatCard
+          label="Exercises"
+          value={workout.exercises.length}
+          icon={<Barbell weight="bold" className="size-3" />}
+        />
+        <StatCard
+          label="Sets"
+          value={totalSets}
+          icon={<Stack weight="bold" className="size-3" />}
+        />
+        <StatCard
+          label="Volume"
+          value={totalVolume}
+          unit={unit}
+          icon={<ChartBar weight="bold" className="size-3" />}
+        />
       </div>
 
       <div className="flex flex-col gap-3">
-        {workout.exercises.map((ex, i) => (
-          <div key={i} className="rounded-card border border-border bg-card p-4">
-            <p className="font-medium">{ex.name}</p>
-            <ul className="mt-2 flex flex-col gap-1">
-              {ex.sets.map((s, j) => (
+        {workout.exercises.map((exercise, exerciseIndex) => (
+          <div key={exerciseIndex} className={exerciseCardStyles}>
+            <p className="font-display text-base font-extrabold">
+              {exercise.name}
+            </p>
+            <ul className="mt-3 flex flex-col gap-1.5">
+              {exercise.sets.map((set, setIndex) => (
                 <li
-                  key={j}
-                  className="flex items-center justify-between text-sm"
+                  key={setIndex}
+                  className="flex items-center justify-between border-t border-border pt-1.5 first:border-t-0 first:pt-0"
                 >
-                  <span className="text-muted-foreground">Set {j + 1}</span>
-                  <span className="tabular-nums">
-                    {s.reps} × {s.weight} {unit}
+                  <span className="mono-label text-[10px] text-dim">
+                    Set {setIndex + 1}
+                  </span>
+                  <span className="font-mono text-sm tabular-nums text-bright">
+                    {set.reps} × {set.weight} {unit}
                   </span>
                 </li>
               ))}
@@ -158,20 +201,18 @@ export default function WorkoutDetailPage() {
 
       {confirmDelete && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
           onClick={() => !deleting && setConfirmDelete(false)}
           role="dialog"
           aria-modal="true"
         >
           <div
-            className="w-full max-w-sm rounded-card border border-border bg-card p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-[16px] border border-border-strong bg-card p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center gap-2 text-red-600">
+            <div className="flex items-center gap-2 text-red-500">
               <WarningCircle weight="fill" className="size-5" />
-              <h2 className="text-lg font-semibold tracking-tight">
-                Delete workout?
-              </h2>
+              <h2 className="font-display text-lg font-black">Delete workout?</h2>
             </div>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               &ldquo;{workout.name}&rdquo; will be permanently removed from your
@@ -192,17 +233,6 @@ export default function WorkoutDetailPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-card border border-border bg-card p-4 text-center">
-      <p className="text-2xl font-semibold tracking-tight tabular-nums">
-        {value}
-      </p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
     </div>
   );
 }
